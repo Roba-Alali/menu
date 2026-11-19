@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import {
@@ -33,6 +34,9 @@ interface AuthContextValue {
   publicUser: PublicUser | null;
   isAuthReady: boolean;
   isPlatformAdmin: boolean;
+  isSigningIn: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
   signInWithGoogle: () => Promise<PublicUser | null>;
   signOutUser: () => Promise<void>;
   resolveDefaultRoute: (user: PublicUser | null) => Promise<string>;
@@ -110,6 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [publicUser, setPublicUser] = useState<PublicUser | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const popupInFlightRef = useRef<Promise<PublicUser | null> | null>(null);
 
   useEffect(() => {
     void testConnection();
@@ -142,16 +149,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, []);
 
+  const clearAuthError = useCallback(() => {
+    setAuthError(null);
+  }, []);
+
   const signInWithGoogle = useCallback(async (): Promise<PublicUser | null> => {
-    const result = await signInWithPopup(auth, googleProvider);
-    if (!result.user) return null;
-    const profile = await syncUserAndRole(result.user);
-    setFirebaseUser(result.user);
-    setPublicUser(profile);
-    return profile;
+    if (popupInFlightRef.current) {
+      return popupInFlightRef.current;
+    }
+
+    setAuthError(null);
+    setIsSigningIn(true);
+
+    const pending = (async () => {
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        if (!result.user) return null;
+        const profile = await syncUserAndRole(result.user);
+        setFirebaseUser(result.user);
+        setPublicUser(profile);
+        return profile;
+      } catch (error) {
+        const code =
+          typeof error === "object" && error !== null && "code" in error
+            ? String((error as { code?: unknown }).code || "")
+            : "";
+
+        if (
+          code === "auth/cancelled-popup-request" ||
+          code === "auth/popup-closed-by-user"
+        ) {
+          return null;
+        }
+
+        if (code === "auth/popup-blocked") {
+          setAuthError(
+            "Sign-in popup was blocked by your browser. Please allow popups for this site and try again."
+          );
+          return null;
+        }
+
+        setAuthError(
+          error instanceof Error
+            ? error.message
+            : "Failed to sign in with Google."
+        );
+        return null;
+      } finally {
+        popupInFlightRef.current = null;
+        setIsSigningIn(false);
+      }
+    })();
+
+    popupInFlightRef.current = pending;
+    return pending;
   }, []);
 
   const signOutUser = useCallback(async () => {
+    setAuthError(null);
     await signOut(auth);
     setFirebaseUser(null);
     setPublicUser(null);
@@ -201,6 +256,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         publicUser,
         isAuthReady,
         isPlatformAdmin,
+        isSigningIn,
+        authError,
+        clearAuthError,
         signInWithGoogle,
         signOutUser,
         resolveDefaultRoute,

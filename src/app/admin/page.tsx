@@ -18,6 +18,8 @@ export default function AdminPage() {
     publicUser,
     isAuthReady,
     isPlatformAdmin,
+    isSigningIn,
+    authError,
     signInWithGoogle,
     signOutUser,
   } = useAuth();
@@ -71,6 +73,15 @@ export default function AdminPage() {
               : `Sign in with your Platform Admin Google account (${BOOT_ADMIN_EMAIL}) to access tenant provisioning and Firestore controls.`}
           </p>
 
+          {authError && (
+            <div
+              role="alert"
+              className="mt-4 rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-xs text-red-200"
+            >
+              {authError}
+            </div>
+          )}
+
           <div className="mt-6 flex flex-wrap gap-3">
             {publicUser ? (
               <button
@@ -83,10 +94,11 @@ export default function AdminPage() {
             ) : (
               <button
                 type="button"
+                disabled={isSigningIn}
                 onClick={() => void signInWithGoogle()}
-                className="h-11 flex-1 rounded-full bg-[#c8a66a] px-6 text-sm font-semibold text-[#10110e]"
+                className="h-11 flex-1 rounded-full bg-[#c8a66a] px-6 text-sm font-semibold text-[#10110e] transition-opacity hover:opacity-90 disabled:opacity-60"
               >
-                Continue with Google
+                {isSigningIn ? "Connecting Google..." : "Continue with Google"}
               </button>
             )}
             <Link

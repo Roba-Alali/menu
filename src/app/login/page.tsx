@@ -16,6 +16,9 @@ function LoginForm() {
     publicUser,
     isAuthReady,
     isPlatformAdmin,
+    isSigningIn,
+    authError,
+    clearAuthError,
     signInWithGoogle,
     signOutUser,
     resolveDefaultRoute,
@@ -27,11 +30,11 @@ function LoginForm() {
 
   async function handleGoogleLogin() {
     setError("");
+    clearAuthError();
     setLoading(true);
     try {
       const user = await signInWithGoogle();
       if (!user) {
-        setError("Google sign-in was cancelled.");
         setLoading(false);
         return;
       }
@@ -129,25 +132,25 @@ function LoginForm() {
               </div>
             ) : (
               <div className="mt-8 space-y-4">
-                {error && (
+                {(error || authError) && (
                   <div
                     role="alert"
                     className="rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-xs text-red-200"
                   >
-                    {error}
+                    {error || authError}
                   </div>
                 )}
 
                 <button
                   type="button"
-                  disabled={loading || !isAuthReady}
+                  disabled={loading || isSigningIn || !isAuthReady}
                   onClick={() => void handleGoogleLogin()}
                   className="flex h-12 w-full items-center justify-center gap-3 rounded-full bg-[#c8a66a] px-6 text-sm font-semibold text-[#10110e] transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
                   <span>
                     {!isAuthReady
                       ? "Checking session..."
-                      : loading
+                      : loading || isSigningIn
                         ? "Connecting Google..."
                         : "Continue with Google"}
                   </span>
