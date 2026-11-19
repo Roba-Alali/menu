@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 import { fetchLandingPreviewData } from "@/lib/firestore-service";
 import type { Restaurant } from "@/lib/types";
 
@@ -96,15 +97,13 @@ export default function LandingPreview({
                 {restaurant.description}
               </p>
             </div>
-            <div
-              className="grid h-12 w-12 shrink-0 place-items-center rounded-full border text-sm font-semibold"
-              style={{
-                borderColor: restaurant.primaryColor,
-                color: restaurant.primaryColor,
-              }}
-            >
-              {restaurant.logoText}
-            </div>
+            <BrandLogo
+              logoUrl={restaurant.logoUrl}
+              logoText={restaurant.logoText}
+              alt={restaurant.name}
+              accentColor={restaurant.primaryColor}
+              size="lg"
+            />
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-3">

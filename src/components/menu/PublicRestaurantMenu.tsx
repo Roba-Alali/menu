@@ -13,6 +13,7 @@ import {
   ShoppingBag,
   X,
 } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 import DishImage from "@/components/DishImage";
 import { placePublicOrderInFirestore } from "@/lib/firestore-service";
 import type {
@@ -272,9 +273,18 @@ export default function PublicRestaurantMenu({
         <div className="mx-auto flex h-16 max-w-4xl items-center justify-between gap-4 px-5">
           <Link
             href="/"
-            className="whitespace-nowrap shrink-0 text-xs font-medium tracking-[0.18em] text-[#9aa6a1] hover:text-[#f5f5f1]"
+            className="inline-flex min-w-0 items-center gap-2.5 whitespace-nowrap shrink-0 text-xs font-medium tracking-[0.18em] text-[#9aa6a1] hover:text-[#f5f5f1]"
           >
-            {isAr ? restaurant.nameAr || restaurant.name : restaurant.name}
+            <BrandLogo
+              logoUrl={restaurant.logoUrl}
+              logoText={restaurant.logoText}
+              alt={restaurant.name}
+              accentColor={accent}
+              size="sm"
+            />
+            <span className="truncate">
+              {isAr ? restaurant.nameAr || restaurant.name : restaurant.name}
+            </span>
           </Link>
 
           <div className="flex items-center gap-3">
@@ -311,12 +321,14 @@ export default function PublicRestaurantMenu({
           className="relative mt-6 overflow-hidden rounded-3xl border border-[#252d2b] p-7 text-center md:p-10"
           style={{ backgroundColor: surface }}
         >
-          <div
-            className="mx-auto grid h-16 w-16 place-items-center rounded-full border text-xl font-semibold"
-            style={{ borderColor: accent, color: accent }}
-          >
-            {restaurant.logoText}
-          </div>
+          <BrandLogo
+            logoUrl={restaurant.logoUrl}
+            logoText={restaurant.logoText}
+            alt={restaurant.name}
+            accentColor={accent}
+            size="xl"
+            className="mx-auto"
+          />
           <p
             className="mt-4 text-[11px] font-medium tracking-[0.28em]"
             style={{ color: accent }}

@@ -26,6 +26,7 @@ export interface Restaurant {
   description: string;
   descriptionAr: string;
   logoText: string;
+  logoUrl?: string;
   coverUrl: string;
   primaryColor: string;
   secondaryColor: string;

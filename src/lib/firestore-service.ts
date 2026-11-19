@@ -71,6 +71,7 @@ function mapRestaurant(id: string, data: Record<string, unknown>): Restaurant {
     description: String(data.description || ""),
     descriptionAr: String(data.descriptionAr || ""),
     logoText: String(data.logoText || "Q"),
+    logoUrl: typeof data.logoUrl === "string" ? data.logoUrl : "",
     coverUrl: String(data.coverUrl || "/images/restaurant_hero_interior.jpg"),
     primaryColor: String(data.primaryColor || "#c8a66a"),
     secondaryColor: String(data.secondaryColor || "#111515"),
@@ -567,6 +568,7 @@ export async function seedInitialDemoDataIfEmpty(
         description: clamp(rest.description, 500),
         descriptionAr: clamp(rest.descriptionAr, 500),
         logoText: clamp(rest.logoText, 4, "Q") || "Q",
+        logoUrl: clamp(rest.logoUrl, 200000),
         coverUrl: clamp(rest.coverUrl, 500),
         primaryColor: clamp(rest.primaryColor, 20, "#c8a66a"),
         secondaryColor: clamp(rest.secondaryColor, 20, "#111515"),
@@ -862,6 +864,7 @@ export async function provisionRestaurantInFirestore(
     nameAr?: string;
     slug?: string;
     description?: string;
+    logoUrl?: string;
     primaryColor?: string;
     secondaryColor?: string;
     currency?: string;
@@ -916,6 +919,7 @@ export async function provisionRestaurantInFirestore(
         500
       ),
       logoText: clamp(input.name.trim().charAt(0).toUpperCase(), 4, "Q") || "Q",
+      logoUrl: clamp(input.logoUrl, 200000),
       coverUrl: "/images/restaurant_hero_interior.jpg",
       primaryColor: clamp(input.primaryColor, 20, "#c8a66a"),
       secondaryColor: clamp(input.secondaryColor, 20, "#111515"),
@@ -1361,6 +1365,8 @@ export async function saveRestaurantBrandInFirestore(
       clean.descriptionAr = clamp(patch.descriptionAr, 500);
     if (patch.logoText !== undefined)
       clean.logoText = clamp(patch.logoText, 4, "Q") || "Q";
+    if (patch.logoUrl !== undefined)
+      clean.logoUrl = clamp(patch.logoUrl, 200000);
     if (patch.coverUrl !== undefined)
       clean.coverUrl = clamp(patch.coverUrl, 500);
     if (patch.primaryColor !== undefined)

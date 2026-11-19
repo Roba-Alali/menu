@@ -21,9 +21,12 @@ import {
   Settings,
   ShoppingBag,
   Trash2,
+  Upload,
   Users,
   X,
 } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
+import { processLogoFile } from "@/lib/logo-upload";
 import {
   addPlatformOperator,
   deleteRestaurantCascade,
@@ -151,6 +154,7 @@ export default function SuperAdminConsole({
     nameAr: "",
     slug: "",
     description: "",
+    logoUrl: "",
     ownerName: "",
     ownerEmail: "",
     plan: "Growth" as PlanTier,
@@ -225,6 +229,7 @@ export default function SuperAdminConsole({
         nameAr: "",
         slug: "",
         description: "",
+        logoUrl: "",
         ownerName: "",
         ownerEmail: "",
         plan: "Growth",
@@ -574,15 +579,13 @@ export default function SuperAdminConsole({
                         >
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
-                              <span
-                                className="grid h-8 w-8 shrink-0 place-items-center rounded-full border text-xs font-semibold"
-                                style={{
-                                  borderColor: r.primaryColor,
-                                  color: r.primaryColor,
-                                }}
-                              >
-                                {r.logoText}
-                              </span>
+                              <BrandLogo
+                                logoUrl={r.logoUrl}
+                                logoText={r.logoText}
+                                alt={r.name}
+                                accentColor={r.primaryColor}
+                                size="sm"
+                              />
                               <div>
                                 <p className="font-medium text-[#f5f5f1]">
                                   {r.name}
@@ -717,10 +720,21 @@ export default function SuperAdminConsole({
                             className="border-b border-[#252d2b]/70 transition-colors hover:bg-[#151a19]"
                           >
                             <td className="px-5 py-4">
-                              <p className="font-medium text-[#f5f5f1]">
-                                {r.name}
-                              </p>
-                              <p className="muted text-xs">{r.ownerEmail}</p>
+                              <div className="flex items-center gap-3">
+                                <BrandLogo
+                                  logoUrl={r.logoUrl}
+                                  logoText={r.logoText}
+                                  alt={r.name}
+                                  accentColor={r.primaryColor}
+                                  size="sm"
+                                />
+                                <div>
+                                  <p className="font-medium text-[#f5f5f1]">
+                                    {r.name}
+                                  </p>
+                                  <p className="muted text-xs">{r.ownerEmail}</p>
+                                </div>
+                              </div>
                             </td>
                             <td className="px-5 py-4">
                               <div className="flex items-center gap-1.5 text-xs">
@@ -1362,6 +1376,69 @@ export default function SuperAdminConsole({
                         }
                         className="h-10 w-full cursor-pointer rounded-xl border border-[#252d2b] bg-[#0d1010] p-1"
                       />
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[#252d2b] bg-[#0d1010] p-3.5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <BrandLogo
+                          logoUrl={form.logoUrl}
+                          logoText={
+                            form.name.trim().charAt(0).toUpperCase() || "Q"
+                          }
+                          alt={form.name || "Client logo"}
+                          accentColor={form.primaryColor}
+                          size="md"
+                        />
+                        <div>
+                          <p className="text-xs font-medium text-[#f5f5f1]">
+                            Client logo (optional)
+                          </p>
+                          <p className="muted text-[11px]">
+                            Upload PNG, JPG, WebP, or SVG — editable later by client.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[#39413e] px-3.5 py-1.5 text-xs font-medium text-[#f5f5f1] hover:border-[#c8a66a]">
+                          <Upload size={12} />
+                          {form.logoUrl ? "Change logo" : "Upload logo"}
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setCreateError("");
+                              void processLogoFile(file)
+                                .then((res) =>
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    logoUrl: res.dataUrl,
+                                  }))
+                                )
+                                .catch((err) =>
+                                  setCreateError(
+                                    err instanceof Error
+                                      ? err.message
+                                      : "Invalid logo image."
+                                  )
+                                );
+                            }}
+                          />
+                        </label>
+                        {form.logoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setForm({ ...form, logoUrl: "" })}
+                            className="text-xs text-[#9aa6a1] hover:text-red-300"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 

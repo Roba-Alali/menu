@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -13,6 +13,7 @@ import {
   Download,
   ExternalLink,
   Globe,
+  ImagePlus,
   LayoutDashboard,
   LogOut,
   MapPin,
@@ -22,12 +23,15 @@ import {
   QrCode,
   ShoppingBag,
   Trash2,
+  Upload,
   Users,
   UtensilsCrossed,
   X,
 } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 import DishImage from "@/components/DishImage";
 import { useAuth } from "@/components/AuthProvider";
+import { isValidLogoUrl, processLogoFile } from "@/lib/logo-upload";
 import { db } from "@/lib/firebase";
 import {
   OperationType,
@@ -125,6 +129,9 @@ export default function RestaurantDashboard({
 
   // Brand editor state
   const [brandSaving, setBrandSaving] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState("");
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
   const [previewLocale, setPreviewLocale] = useState<LocaleCode>(
     initialBundle.restaurant.defaultLocale
   );
@@ -266,8 +273,63 @@ export default function RestaurantDashboard({
     return () => unsub();
   }, [initialBundle.restaurant.slug]);
 
+  async function handleLogoFileSelected(file: File | undefined) {
+    if (!file) return;
+    setLogoError("");
+    setLogoUploading(true);
+    try {
+      const processed = await processLogoFile(file);
+      setRestaurant((prev) => ({ ...prev, logoUrl: processed.dataUrl }));
+      await saveRestaurantBrandInFirestore(
+        restaurant.slug,
+        { logoUrl: processed.dataUrl },
+        initialBundle.restaurant.isPublished
+      );
+      await refreshBundle();
+      showToast("Client logo uploaded and saved to menu.");
+    } catch (err) {
+      setLogoError(
+        err instanceof Error ? err.message : "Could not upload this logo."
+      );
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) {
+        logoInputRef.current.value = "";
+      }
+    }
+  }
+
+  async function handleRemoveLogo() {
+    setLogoError("");
+    setLogoUploading(true);
+    try {
+      setRestaurant((prev) => ({ ...prev, logoUrl: "" }));
+      await saveRestaurantBrandInFirestore(
+        restaurant.slug,
+        { logoUrl: "" },
+        initialBundle.restaurant.isPublished
+      );
+      await refreshBundle();
+      showToast("Logo removed. Showing monogram badge.");
+    } catch (err) {
+      setLogoError(
+        err instanceof Error ? err.message : "Could not remove logo."
+      );
+    } finally {
+      setLogoUploading(false);
+    }
+  }
+
   async function handleSaveBrand(e?: React.FormEvent) {
     if (e) e.preventDefault();
+    const trimmedLogoUrl = (restaurant.logoUrl || "").trim();
+    if (!isValidLogoUrl(trimmedLogoUrl)) {
+      setLogoError(
+        "Logo URL must start with https://, http://, /, or be an uploaded image."
+      );
+      return;
+    }
+    setLogoError("");
     setBrandSaving(true);
     try {
       await saveRestaurantBrandInFirestore(
@@ -278,6 +340,7 @@ export default function RestaurantDashboard({
           description: restaurant.description,
           descriptionAr: restaurant.descriptionAr,
           logoText: restaurant.logoText,
+          logoUrl: trimmedLogoUrl,
           coverUrl: restaurant.coverUrl,
           primaryColor: restaurant.primaryColor,
           secondaryColor: restaurant.secondaryColor,
@@ -557,15 +620,13 @@ export default function RestaurantDashboard({
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col justify-between border-r border-[#252d2b] bg-[#0d1010] p-6 md:flex">
         <div>
           <div className="flex items-center gap-3">
-            <span
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border text-sm font-semibold"
-              style={{
-                borderColor: restaurant.primaryColor,
-                color: restaurant.primaryColor,
-              }}
-            >
-              {restaurant.logoText}
-            </span>
+            <BrandLogo
+              logoUrl={restaurant.logoUrl}
+              logoText={restaurant.logoText}
+              alt={restaurant.name}
+              accentColor={restaurant.primaryColor}
+              size="md"
+            />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{restaurant.name}</p>
               <p className="font-mono-num muted truncate text-[11px]">
@@ -965,10 +1026,103 @@ export default function RestaurantDashboard({
                   />
                 </div>
 
+                {/* Client Logo Uploader */}
+                <div className="rounded-2xl border border-[#252d2b] bg-[#0d1010] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3.5">
+                      <BrandLogo
+                        logoUrl={restaurant.logoUrl}
+                        logoText={restaurant.logoText}
+                        alt={restaurant.name}
+                        accentColor={restaurant.primaryColor}
+                        size="lg"
+                      />
+                      <div>
+                        <p className="text-xs font-semibold text-[#f5f5f1]">
+                          Client menu logo
+                        </p>
+                        <p className="muted mt-0.5 text-[11px]">
+                          Shown in your public menu header, storefront hero, and QR views. PNG, JPG, WebP, or SVG.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                        className="hidden"
+                        onChange={(e) =>
+                          void handleLogoFileSelected(e.target.files?.[0])
+                        }
+                      />
+                      <button
+                        type="button"
+                        disabled={logoUploading}
+                        onClick={() => logoInputRef.current?.click()}
+                        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#c8a66a] bg-[#1a1812] px-4 py-2 text-xs font-semibold text-[#e5c991] transition-colors hover:bg-[#c8a66a] hover:text-[#10110e] disabled:opacity-50"
+                      >
+                        {logoUploading ? (
+                          <>
+                            <ImagePlus size={13} />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={13} />
+                            {restaurant.logoUrl ? "Replace logo" : "Upload logo"}
+                          </>
+                        )}
+                      </button>
+                      {restaurant.logoUrl && (
+                        <button
+                          type="button"
+                          disabled={logoUploading}
+                          onClick={() => void handleRemoveLogo()}
+                          className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-[#252d2b] px-3.5 py-2 text-xs text-[#aab4af] hover:border-red-400/50 hover:text-red-300"
+                        >
+                          <Trash2 size={12} /> Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 border-t border-[#252d2b]/70 pt-3">
+                    <label className="mb-1 block text-[11px] font-medium text-[#9aa6a1]">
+                      Or paste an external logo URL (https://...)
+                    </label>
+                    <input
+                      type="text"
+                      value={
+                        restaurant.logoUrl?.startsWith("data:")
+                          ? ""
+                          : restaurant.logoUrl || ""
+                      }
+                      onChange={(e) => {
+                        setLogoError("");
+                        setRestaurant({ ...restaurant, logoUrl: e.target.value });
+                      }}
+                      placeholder={
+                        restaurant.logoUrl?.startsWith("data:")
+                          ? "Uploaded logo image active (click Replace logo or Remove above)"
+                          : "https://cdn.example.com/client-logo.png"
+                      }
+                      className="font-mono-num h-9 w-full rounded-xl border border-[#252d2b] bg-[#111515] px-3 text-xs text-[#f5f5f1]"
+                    />
+                  </div>
+
+                  {logoError && (
+                    <p className="mt-2 text-xs text-red-300" role="alert">
+                      {logoError}
+                    </p>
+                  )}
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-[#aab4af]">
-                      Monogram (1-2 chars)
+                      Fallback monogram (1-2 chars)
                     </label>
                     <input
                       type="text"
@@ -1132,15 +1286,14 @@ export default function RestaurantDashboard({
                   style={{ backgroundColor: restaurant.secondaryColor }}
                 >
                   <div className="text-center">
-                    <div
-                      className="mx-auto grid h-14 w-14 place-items-center rounded-full border text-lg font-semibold"
-                      style={{
-                        borderColor: restaurant.primaryColor,
-                        color: restaurant.primaryColor,
-                      }}
-                    >
-                      {restaurant.logoText}
-                    </div>
+                    <BrandLogo
+                      logoUrl={restaurant.logoUrl}
+                      logoText={restaurant.logoText}
+                      alt={restaurant.name}
+                      accentColor={restaurant.primaryColor}
+                      size="preview"
+                      className="mx-auto"
+                    />
                     <p
                       className="mt-3 text-[10px] font-medium tracking-[0.25em]"
                       style={{ color: restaurant.primaryColor }}

@@ -88,7 +88,7 @@ service cloud.firestore {
 
     function isValidRestaurant(data) {
       return data.keys().hasAll(['id', 'name', 'nameAr', 'slug', 'description', 'descriptionAr', 'logoText', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'plan', 'status', 'ownerUid', 'createdAt', 'updatedAt']) &&
-        data.keys().hasOnly(['id', 'name', 'nameAr', 'slug', 'description', 'descriptionAr', 'logoText', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'plan', 'status', 'ownerUid', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'name', 'nameAr', 'slug', 'description', 'descriptionAr', 'logoText', 'logoUrl', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'plan', 'status', 'ownerUid', 'createdAt', 'updatedAt']) &&
         isValidId(data.id) &&
         data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
         data.nameAr is string && data.nameAr.size() <= 120 &&
@@ -96,6 +96,7 @@ service cloud.firestore {
         data.description is string && data.description.size() <= 500 &&
         data.descriptionAr is string && data.descriptionAr.size() <= 500 &&
         data.logoText is string && data.logoText.size() >= 1 && data.logoText.size() <= 4 &&
+        (!('logoUrl' in data) || (data.logoUrl is string && data.logoUrl.size() <= 200000 && (data.logoUrl == '' || data.logoUrl.matches('^(https?://|/|data:image/(png|jpeg|jpg|webp|gif);base64,).*')))) &&
         data.coverUrl is string && data.coverUrl.size() <= 500 &&
         data.primaryColor is string && data.primaryColor.size() >= 4 && data.primaryColor.size() <= 20 &&
         data.secondaryColor is string && data.secondaryColor.size() >= 4 && data.secondaryColor.size() <= 20 &&
@@ -272,8 +273,8 @@ service cloud.firestore {
         incoming().slug == existing().slug &&
         incoming().createdAt == existing().createdAt &&
         incoming().updatedAt == request.time && (
-          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nameAr', 'description', 'descriptionAr', 'logoText', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'plan', 'status', 'ownerUid', 'updatedAt'])) ||
-          (isRestaurantMember(slug) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nameAr', 'description', 'descriptionAr', 'logoText', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'ownerUid', 'updatedAt']))
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nameAr', 'description', 'descriptionAr', 'logoText', 'logoUrl', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'plan', 'status', 'ownerUid', 'updatedAt'])) ||
+          (isRestaurantMember(slug) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nameAr', 'description', 'descriptionAr', 'logoText', 'logoUrl', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'ownerUid', 'updatedAt']))
         );
       allow delete: if isAdmin() && isValidId(slug);
 
