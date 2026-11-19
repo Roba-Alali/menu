@@ -1,73 +1,113 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
 import SuperAdminConsole, {
   type SuperAdminInitialData,
 } from "@/components/admin/SuperAdminConsole";
-import { getSessionUser } from "@/lib/auth";
-import { getStore, toPublicUser } from "@/lib/store";
+import { BOOT_ADMIN_EMAIL } from "@/lib/demo-fallback";
+import {
+  fetchSuperAdminPlatformData,
+  seedInitialDemoDataIfEmpty,
+} from "@/lib/firestore-service";
 
-export const dynamic = "force-dynamic";
+export default function AdminPage() {
+  const {
+    publicUser,
+    isAuthReady,
+    isPlatformAdmin,
+    signInWithGoogle,
+    signOutUser,
+  } = useAuth();
 
-export default async function AdminPage() {
-  const user = await getSessionUser();
-  if (!user || (user.platformRole !== "owner" && user.platformRole !== "support")) {
-    redirect("/login?next=/admin");
+  const [data, setData] = useState<SuperAdminInitialData | null>(null);
+  const [loadingData, setLoadingData] = useState(false);
+
+  const loadPlatform = useCallback(async () => {
+    if (!publicUser || !isPlatformAdmin) return;
+    setLoadingData(true);
+    try {
+      await seedInitialDemoDataIfEmpty(publicUser.id);
+      const payload = await fetchSuperAdminPlatformData();
+      setData({
+        currentUser: publicUser,
+        ...payload,
+      });
+    } finally {
+      setLoadingData(false);
+    }
+  }, [publicUser, isPlatformAdmin]);
+
+  useEffect(() => {
+    if (isAuthReady && publicUser && isPlatformAdmin) {
+      void loadPlatform();
+    }
+  }, [isAuthReady, publicUser, isPlatformAdmin, loadPlatform]);
+
+  if (!isAuthReady) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#090b0b] text-sm text-[#9aa6a1]">
+        Verifying platform session...
+      </main>
+    );
   }
 
-  const store = getStore();
-  const restaurants = store.restaurants.map((r) => {
-    const restOrders = store.orders.filter((o) => o.restaurantId === r.id);
-    const restProducts = store.products.filter((p) => p.restaurantId === r.id);
-    const restBranches = store.branches.filter((b) => b.restaurantId === r.id);
-    const restDomains = store.domains.filter((d) => d.restaurantId === r.id);
-    const restMembers = store.members.filter((m) => m.restaurantId === r.id);
-    const revenue = restOrders
-      .filter((o) => o.status !== "cancelled")
-      .reduce((sum, o) => sum + o.total, 0);
+  if (!publicUser || !isPlatformAdmin) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#090b0b] px-5 py-12">
+        <div className="panel w-full max-w-md p-7 md:p-8">
+          <div className="flex items-center gap-2 text-xs font-medium tracking-[0.18em] text-[#c8a66a]">
+            <ShieldCheck size={15} />
+            <span>SUPER ADMIN ACCESS</span>
+          </div>
+          <h1 className="font-display mt-3 text-3xl font-semibold">
+            Platform operator sign-in required
+          </h1>
+          <p className="muted mt-2 text-sm leading-6">
+            {publicUser
+              ? `Signed in as ${publicUser.email}, which does not hold a Platform Admin role. Sign in with ${BOOT_ADMIN_EMAIL} or an authorized operator account.`
+              : `Sign in with your Platform Admin Google account (${BOOT_ADMIN_EMAIL}) to access tenant provisioning and Firestore controls.`}
+          </p>
 
-    return {
-      ...r,
-      productCount: restProducts.length,
-      branchCount: restBranches.length,
-      orderCount: restOrders.length,
-      revenue: Number(revenue.toFixed(2)),
-      primaryDomain: restDomains[0]?.hostname || `${r.slug}.qlub.app`,
-      domainVerified: restDomains[0]?.isVerified ?? false,
-      ownerEmail: restMembers.find((m) => m.role === "admin")?.email || "—",
-    };
-  });
+          <div className="mt-6 flex flex-wrap gap-3">
+            {publicUser ? (
+              <button
+                type="button"
+                onClick={() => void signOutUser()}
+                className="h-11 flex-1 rounded-full bg-[#c8a66a] px-6 text-sm font-semibold text-[#10110e]"
+              >
+                Switch Google account
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void signInWithGoogle()}
+                className="h-11 flex-1 rounded-full bg-[#c8a66a] px-6 text-sm font-semibold text-[#10110e]"
+              >
+                Continue with Google
+              </button>
+            )}
+            <Link
+              href="/"
+              className="flex h-11 items-center rounded-full border border-[#39413e] px-5 text-xs font-medium"
+            >
+              Home
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
-  const initialData: SuperAdminInitialData = {
-    currentUser: user,
-    restaurants,
-    platformUsers: store.users
-      .filter((u) => Boolean(u.platformRole))
-      .map(toPublicUser),
-    allMembers: store.members.map((m) => {
-      const rest = store.restaurants.find((r) => r.id === m.restaurantId);
-      return {
-        ...m,
-        restaurantName: rest?.name || "Unknown",
-        restaurantSlug: rest?.slug || "",
-      };
-    }),
-    settings: store.settings,
-    stats: {
-      totalRestaurants: store.restaurants.length,
-      publishedMenus: store.restaurants.filter((r) => r.isPublished).length,
-      totalOrders: store.orders.length,
-      totalProducts: store.products.length,
-      totalRevenue: Number(
-        store.orders
-          .filter((o) => o.status !== "cancelled")
-          .reduce((sum, o) => sum + o.total, 0)
-          .toFixed(2)
-      ),
-    },
-    supabaseConfigured: Boolean(
-      process.env.NEXT_PUBLIC_SUPABASE_URL &&
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    ),
-  };
+  if (!data) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#090b0b] text-sm text-[#9aa6a1]">
+        {loadingData ? "Loading QLUB Firestore control plane..." : "Initializing workspace..."}
+      </main>
+    );
+  }
 
-  return <SuperAdminConsole initialData={initialData} />;
+  return <SuperAdminConsole initialData={data} onRefresh={loadPlatform} />;
 }

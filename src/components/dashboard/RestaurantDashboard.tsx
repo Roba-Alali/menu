@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { collection, onSnapshot } from "firebase/firestore";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeft,
@@ -26,11 +27,38 @@ import {
   X,
 } from "lucide-react";
 import DishImage from "@/components/DishImage";
+import { useAuth } from "@/components/AuthProvider";
+import { db } from "@/lib/firebase";
+import {
+  OperationType,
+  handleFirestoreError,
+  safeTimestampToIso,
+} from "@/lib/firestore-errors";
+import {
+  addBranchInFirestore,
+  addCategoryInFirestore,
+  addDomainInFirestore,
+  addRestaurantMemberInFirestore,
+  createQrCodeInFirestore,
+  deleteBranchInFirestore,
+  deleteCategoryInFirestore,
+  deleteDomainInFirestore,
+  deleteProductInFirestore,
+  deleteQrCodeInFirestore,
+  removeRestaurantMemberInFirestore,
+  saveProductInFirestore,
+  saveRestaurantBrandInFirestore,
+  toggleCategoryActiveInFirestore,
+  toggleProductAvailabilityInFirestore,
+  updateOrderStatusInFirestore,
+  verifyDomainInFirestore,
+} from "@/lib/firestore-service";
 import type {
   Branch,
   LocaleCode,
   MenuCategory,
   Order,
+  OrderItem,
   OrderStatus,
   Product,
   ProductOption,
@@ -69,12 +97,15 @@ export default function RestaurantDashboard({
   initialBundle,
   currentUser,
   cnameTarget,
+  onRefresh,
 }: {
   initialBundle: RestaurantBundle;
   currentUser: PublicUser;
   cnameTarget: string;
+  onRefresh: () => Promise<void>;
 }) {
   const router = useRouter();
+  const { signOutUser } = useAuth();
   const [tab, setTab] = useState<DashTab>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -175,27 +206,73 @@ export default function RestaurantDashboard({
   }
 
   async function refreshBundle() {
-    const res = await fetch(`/api/restaurants/${restaurant.slug}`);
-    if (!res.ok) return;
-    const data = (await res.json()) as RestaurantBundle;
-    setRestaurant(data.restaurant);
-    setBranches(data.branches || []);
-    setCategories(data.categories || []);
-    setProducts(data.products || []);
-    setDomains(data.domains || []);
-    setQrCodes(data.qrCodes || []);
-    setMembers(data.members || []);
-    setOrders(data.orders || []);
+    await onRefresh();
   }
+
+  useEffect(() => {
+    setRestaurant(initialBundle.restaurant);
+    setBranches(initialBundle.branches || []);
+    setCategories(initialBundle.categories || []);
+    setProducts(initialBundle.products || []);
+    setDomains(initialBundle.domains || []);
+    setQrCodes(initialBundle.qrCodes || []);
+    setMembers(initialBundle.members || []);
+    setOrders(initialBundle.orders || []);
+  }, [initialBundle]);
+
+  // Real-time orders stream for live kitchen updates
+  useEffect(() => {
+    const ordersPath = `restaurants/${initialBundle.restaurant.slug}/orders`;
+    const unsub = onSnapshot(
+      collection(db, "restaurants", initialBundle.restaurant.slug, "orders"),
+      (snap) => {
+        const liveOrders: Order[] = snap.docs
+          .map((d) => {
+            const data = d.data() as Record<string, unknown>;
+            return {
+              id: String(data.id || d.id),
+              restaurantId: String(data.restaurantId || ""),
+              branchId: data.branchId ? String(data.branchId) : null,
+              orderNumber: Number(data.orderNumber ?? 1001),
+              customerName: String(data.customerName || "Guest"),
+              customerPhone: String(data.customerPhone || ""),
+              tableLabel: String(data.tableLabel || "Table 01"),
+              orderType: (data.orderType === "pickup" ? "pickup" : "dine_in") as
+                | "dine_in"
+                | "pickup",
+              status: (data.status || "pending") as OrderStatus,
+              currency: String(data.currency || "SAR"),
+              subtotal: Number(data.subtotal ?? 0),
+              total: Number(data.total ?? 0),
+              notes: String(data.notes || ""),
+              items: Array.isArray(data.items)
+                ? (data.items as OrderItem[])
+                : [],
+              ownerUid: String(data.ownerUid || ""),
+              createdAt: safeTimestampToIso(data.createdAt),
+              updatedAt: safeTimestampToIso(data.updatedAt),
+            };
+          })
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        setOrders(liveOrders);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, ordersPath);
+      }
+    );
+    return () => unsub();
+  }, [initialBundle.restaurant.slug]);
 
   async function handleSaveBrand(e?: React.FormEvent) {
     if (e) e.preventDefault();
     setBrandSaving(true);
     try {
-      const res = await fetch(`/api/restaurants/${restaurant.slug}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await saveRestaurantBrandInFirestore(
+        restaurant.slug,
+        {
           name: restaurant.name,
           nameAr: restaurant.nameAr,
           description: restaurant.description,
@@ -207,13 +284,11 @@ export default function RestaurantDashboard({
           currency: restaurant.currency,
           defaultLocale: restaurant.defaultLocale,
           isPublished: restaurant.isPublished,
-        }),
-      });
-      if (res.ok) {
-        const data = (await res.json()) as { restaurant: Restaurant };
-        setRestaurant(data.restaurant);
-        showToast("Brand & storefront settings saved.");
-      }
+        },
+        initialBundle.restaurant.isPublished
+      );
+      await refreshBundle();
+      showToast("Brand & storefront settings saved to Firestore.");
     } finally {
       setBrandSaving(false);
     }
@@ -221,16 +296,13 @@ export default function RestaurantDashboard({
 
   async function togglePublished() {
     const nextPub = !restaurant.isPublished;
-    const res = await fetch(`/api/restaurants/${restaurant.slug}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isPublished: nextPub }),
-    });
-    if (res.ok) {
-      const data = (await res.json()) as { restaurant: Restaurant };
-      setRestaurant(data.restaurant);
-      showToast(nextPub ? "Menu is now published live." : "Menu moved to draft.");
-    }
+    await saveRestaurantBrandInFirestore(
+      restaurant.slug,
+      { isPublished: nextPub },
+      restaurant.isPublished
+    );
+    await refreshBundle();
+    showToast(nextPub ? "Menu is now published live." : "Menu moved to draft.");
   }
 
   async function handleAddCategory(e: React.FormEvent) {
@@ -238,34 +310,29 @@ export default function RestaurantDashboard({
     if (!catForm.name.trim()) return;
     setCatSaving(true);
     try {
-      const res = await fetch(`/api/restaurants/${restaurant.slug}/categories`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(catForm),
+      await addCategoryInFirestore(restaurant.slug, restaurant, {
+        ...catForm,
+        sortOrder: categories.length + 1,
       });
-      if (res.ok) {
-        setCatForm({ name: "", nameAr: "", description: "" });
-        await refreshBundle();
-        showToast("Category added.");
-      }
+      setCatForm({ name: "", nameAr: "", description: "" });
+      await refreshBundle();
+      showToast("Category added.");
     } finally {
       setCatSaving(false);
     }
   }
 
   async function handleToggleCategory(cat: MenuCategory) {
-    await fetch(`/api/restaurants/${restaurant.slug}/categories`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: cat.id, isActive: !cat.isActive }),
-    });
+    await toggleCategoryActiveInFirestore(
+      restaurant.slug,
+      cat.id,
+      !cat.isActive
+    );
     await refreshBundle();
   }
 
   async function handleDeleteCategory(id: string) {
-    await fetch(`/api/restaurants/${restaurant.slug}/categories?id=${id}`, {
-      method: "DELETE",
-    });
+    await deleteCategoryInFirestore(restaurant.slug, id);
     await refreshBundle();
   }
 
@@ -331,7 +398,7 @@ export default function RestaurantDashboard({
     e.preventDefault();
     setProductSaving(true);
     try {
-      const payload = {
+      await saveProductInFirestore(restaurant.slug, restaurant, {
         id: editingProductId || undefined,
         categoryId: prodForm.categoryId || null,
         name: prodForm.name,
@@ -345,167 +412,116 @@ export default function RestaurantDashboard({
           : null,
         isAvailable: prodForm.isAvailable,
         isFeatured: prodForm.isFeatured,
+        sortOrder: editingProductId
+          ? products.find((p) => p.id === editingProductId)?.sortOrder || 1
+          : products.length + 1,
         allergens: prodForm.allergensText
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean),
         options: prodForm.options,
-      };
-      const res = await fetch(`/api/restaurants/${restaurant.slug}/products`, {
-        method: editingProductId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
       });
-      if (res.ok) {
-        setProductModalOpen(false);
-        await refreshBundle();
-        showToast(editingProductId ? "Dish updated." : "Dish added to menu.");
-      }
+      setProductModalOpen(false);
+      await refreshBundle();
+      showToast(editingProductId ? "Dish updated." : "Dish added to menu.");
     } finally {
       setProductSaving(false);
     }
   }
 
   async function handleToggleAvailability(p: Product) {
-    await fetch(`/api/restaurants/${restaurant.slug}/products`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: p.id, isAvailable: !p.isAvailable }),
-    });
+    await toggleProductAvailabilityInFirestore(
+      restaurant.slug,
+      p.id,
+      !p.isAvailable
+    );
     await refreshBundle();
   }
 
   async function handleDeleteProduct(id: string) {
-    await fetch(`/api/restaurants/${restaurant.slug}/products?id=${id}`, {
-      method: "DELETE",
-    });
+    await deleteProductInFirestore(restaurant.slug, id);
     await refreshBundle();
   }
 
   async function handleAddBranch(e: React.FormEvent) {
     e.preventDefault();
     if (!branchForm.name.trim()) return;
-    const res = await fetch(`/api/restaurants/${restaurant.slug}/branches`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(branchForm),
-    });
-    if (res.ok) {
-      setBranchForm({ name: "", address: "", phone: "" });
-      await refreshBundle();
-      showToast("Branch added.");
-    }
+    await addBranchInFirestore(restaurant.slug, restaurant, branchForm);
+    setBranchForm({ name: "", address: "", phone: "" });
+    await refreshBundle();
+    showToast("Branch added.");
   }
 
   async function handleDeleteBranch(id: string) {
-    await fetch(`/api/restaurants/${restaurant.slug}/branches?id=${id}`, {
-      method: "DELETE",
-    });
+    await deleteBranchInFirestore(restaurant.slug, id);
     await refreshBundle();
   }
 
   async function handleCreateQr(e: React.FormEvent) {
     e.preventDefault();
     if (!qrForm.label.trim()) return;
-    const res = await fetch(`/api/restaurants/${restaurant.slug}/qr`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(qrForm),
+    await createQrCodeInFirestore(restaurant.slug, restaurant, {
+      label: qrForm.label,
+      branchId: qrForm.branchId || null,
+      tableNumber: qrForm.tableNumber,
     });
-    if (res.ok) {
-      setQrForm({ label: "", branchId: branches[0]?.id || "", tableNumber: "" });
-      await refreshBundle();
-      showToast("QR code generated.");
-    }
+    setQrForm({ label: "", branchId: branches[0]?.id || "", tableNumber: "" });
+    await refreshBundle();
+    showToast("QR code generated.");
   }
 
   async function handleDeleteQr(id: string) {
-    await fetch(`/api/restaurants/${restaurant.slug}/qr?id=${id}`, {
-      method: "DELETE",
-    });
+    await deleteQrCodeInFirestore(restaurant.slug, id);
     await refreshBundle();
   }
 
   async function handleUpdateOrderStatus(orderId: string, status: OrderStatus) {
-    const res = await fetch(`/api/orders/${orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    if (res.ok) {
-      await refreshBundle();
-      showToast(`Order marked ${status}.`);
-    }
+    await updateOrderStatusInFirestore(restaurant.slug, orderId, status);
+    showToast(`Order marked ${status}.`);
   }
 
   async function handleAddDomain(e: React.FormEvent) {
     e.preventDefault();
     if (!domainInput.trim()) return;
-    const res = await fetch(`/api/restaurants/${restaurant.slug}/domains`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hostname: domainInput }),
-    });
-    if (res.ok) {
-      setDomainInput("");
-      await refreshBundle();
-      showToast("Custom domain added.");
-    }
+    await addDomainInFirestore(restaurant.slug, restaurant, domainInput);
+    setDomainInput("");
+    await refreshBundle();
+    showToast("Custom domain added.");
   }
 
   async function handleVerifyDomain(id: string) {
-    const res = await fetch(`/api/restaurants/${restaurant.slug}/domains`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, isVerified: true }),
-    });
-    if (res.ok) {
-      await refreshBundle();
-      showToast("Domain verified.");
-    }
+    await verifyDomainInFirestore(restaurant.slug, id);
+    await refreshBundle();
+    showToast("Domain verified.");
   }
 
   async function handleDeleteDomain(id: string) {
-    await fetch(`/api/restaurants/${restaurant.slug}/domains?id=${id}`, {
-      method: "DELETE",
-    });
+    await deleteDomainInFirestore(restaurant.slug, id);
     await refreshBundle();
   }
 
   async function handleAddMember(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch(`/api/restaurants/${restaurant.slug}/members`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(memberForm),
-    });
-    if (res.ok) {
-      const data = (await res.json()) as {
-        temporaryPassword?: string | null;
-        member: RestaurantMember;
-      };
-      setMemberInviteResult(
-        data.temporaryPassword
-          ? `Added ${data.member.email} · Temp password: ${data.temporaryPassword}`
-          : `Added ${data.member.email} (${data.member.role})`
-      );
-      setMemberForm({ fullName: "", email: "", role: "manager" });
-      await refreshBundle();
-    }
+    const member = await addRestaurantMemberInFirestore(
+      restaurant.slug,
+      restaurant,
+      memberForm
+    );
+    setMemberInviteResult(
+      `Invited ${member.email} (${member.role}) — access unlocks automatically when they sign in with Google.`
+    );
+    setMemberForm({ fullName: "", email: "", role: "manager" });
+    await refreshBundle();
   }
 
-  async function handleRemoveMember(userId: string) {
-    await fetch(
-      `/api/restaurants/${restaurant.slug}/members?userId=${userId}`,
-      { method: "DELETE" }
-    );
+  async function handleRemoveMember(memberDocId: string) {
+    await removeRestaurantMemberInFirestore(restaurant.slug, memberDocId);
     await refreshBundle();
   }
 
   async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await signOutUser();
     router.push("/login");
-    router.refresh();
   }
 
   const filteredProducts = useMemo(() => {
@@ -1876,7 +1892,7 @@ export default function RestaurantDashboard({
                 <div className="mt-5 divide-y divide-[#252d2b]">
                   {members.map((m) => (
                     <div
-                      key={m.userId}
+                      key={m.id || m.userId}
                       className="flex items-center justify-between gap-3 py-3 text-xs"
                     >
                       <div>
@@ -1891,7 +1907,7 @@ export default function RestaurantDashboard({
                         </span>
                         <button
                           type="button"
-                          onClick={() => void handleRemoveMember(m.userId)}
+                          onClick={() => void handleRemoveMember(m.id || m.userId)}
                           aria-label={`Remove ${m.fullName}`}
                           className="text-[#9aa6a1] hover:text-red-400"
                         >

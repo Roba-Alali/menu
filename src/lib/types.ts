@@ -11,15 +11,6 @@ export type PlanTier = "Starter" | "Growth" | "Enterprise";
 export type TenantStatus = "Active" | "Setup" | "Suspended";
 export type LocaleCode = "en" | "ar";
 
-export interface UserAccount {
-  id: string;
-  email: string;
-  fullName: string;
-  passwordHash: string;
-  platformRole?: PlatformRole;
-  createdAt: string;
-}
-
 export interface PublicUser {
   id: string;
   email: string;
@@ -43,16 +34,19 @@ export interface Restaurant {
   isPublished: boolean;
   plan: PlanTier;
   status: TenantStatus;
+  ownerUid?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface RestaurantMember {
+  id?: string;
   restaurantId: string;
   userId: string;
   email: string;
   fullName: string;
   role: RestaurantRole;
+  claimedFromId?: string;
   createdAt: string;
 }
 
@@ -63,6 +57,8 @@ export interface Branch {
   address: string;
   phone: string;
   isActive: boolean;
+  isPublic?: boolean;
+  ownerUid?: string;
   createdAt: string;
 }
 
@@ -74,6 +70,8 @@ export interface MenuCategory {
   description: string;
   sortOrder: number;
   isActive: boolean;
+  isPublic?: boolean;
+  ownerUid?: string;
   createdAt: string;
 }
 
@@ -108,6 +106,8 @@ export interface Product {
   sortOrder: number;
   allergens: string[];
   options: ProductOption[];
+  isPublic?: boolean;
+  ownerUid?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -117,6 +117,7 @@ export interface RestaurantDomain {
   restaurantId: string;
   hostname: string;
   isVerified: boolean;
+  ownerUid?: string;
   createdAt: string;
 }
 
@@ -128,6 +129,7 @@ export interface QrCodeRecord {
   targetPath: string;
   token: string;
   isActive: boolean;
+  ownerUid?: string;
   createdAt: string;
 }
 
@@ -161,13 +163,9 @@ export interface Order {
   total: number;
   notes: string;
   items: OrderItem[];
+  ownerUid?: string;
   createdAt: string;
-}
-
-export interface PasswordResetRecord {
-  token: string;
-  email: string;
-  expiresAt: string;
+  updatedAt?: string;
 }
 
 export interface PlatformSettings {
@@ -176,21 +174,7 @@ export interface PlatformSettings {
   defaultCnameTarget: string;
   allowSelfServiceOrdering: boolean;
   defaultCurrency: string;
-}
-
-export interface PlatformStore {
-  users: UserAccount[];
-  restaurants: Restaurant[];
-  members: RestaurantMember[];
-  branches: Branch[];
-  categories: MenuCategory[];
-  products: Product[];
-  domains: RestaurantDomain[];
-  qrCodes: QrCodeRecord[];
-  orders: Order[];
-  passwordResets: PasswordResetRecord[];
-  nextOrderNumber: number;
-  settings: PlatformSettings;
+  updatedAt?: string;
 }
 
 export interface RestaurantBundle {

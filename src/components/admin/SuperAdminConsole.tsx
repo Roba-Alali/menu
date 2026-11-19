@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
@@ -24,6 +24,15 @@ import {
   Users,
   X,
 } from "lucide-react";
+import {
+  addPlatformOperator,
+  deleteRestaurantCascade,
+  provisionRestaurantInFirestore,
+  savePlatformSettingsInFirestore,
+  updateRestaurantAdmin,
+} from "@/lib/firestore-service";
+import { firebaseConfig } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
 import type {
   PlanTier,
   PlatformSettings,
@@ -67,13 +76,11 @@ export interface SuperAdminInitialData {
     totalProducts: number;
     totalRevenue: number;
   };
-  supabaseConfigured: boolean;
 }
 
 interface ProvisionedResult {
   restaurant: Restaurant;
   ownerEmail: string;
-  temporaryPassword: string | null;
   dashboardPath: string;
   publicMenuPath: string;
 }
@@ -106,10 +113,13 @@ const PLAN_DETAILS: Array<{
 
 export default function SuperAdminConsole({
   initialData,
+  onRefresh,
 }: {
   initialData: SuperAdminInitialData;
+  onRefresh: () => Promise<void>;
 }) {
   const router = useRouter();
+  const { signOutUser } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -143,7 +153,6 @@ export default function SuperAdminConsole({
     description: "",
     ownerName: "",
     ownerEmail: "",
-    ownerPassword: "",
     plan: "Growth" as PlanTier,
     currency: "SAR",
     primaryColor: "#c8a66a",
@@ -164,15 +173,16 @@ export default function SuperAdminConsole({
   const [settingsSavedMsg, setSettingsSavedMsg] = useState("");
 
   async function refreshPlatform() {
-    const res = await fetch("/api/platform");
-    if (!res.ok) return;
-    const data = (await res.json()) as Omit<SuperAdminInitialData, "currentUser">;
-    setRestaurants(data.restaurants);
-    setPlatformUsers(data.platformUsers);
-    setAllMembers(data.allMembers);
-    setSettings(data.settings);
-    setStats(data.stats);
+    await onRefresh();
   }
+
+  useEffect(() => {
+    setRestaurants(initialData.restaurants);
+    setPlatformUsers(initialData.platformUsers);
+    setAllMembers(initialData.allMembers);
+    setSettings(initialData.settings);
+    setStats(initialData.stats);
+  }, [initialData]);
 
   const filteredRestaurants = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -201,21 +211,14 @@ export default function SuperAdminConsole({
     setCreateError("");
     setCreating(true);
     try {
-      const res = await fetch("/api/restaurants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const result = await provisionRestaurantInFirestore(
+        {
           ...form,
           status: "Setup",
-        }),
-      });
-      const data = (await res.json()) as ProvisionedResult & { error?: string };
-      if (!res.ok) {
-        setCreateError(data.error || "Failed to provision restaurant.");
-        setCreating(false);
-        return;
-      }
-      setProvisioned(data);
+        },
+        initialData.currentUser.id
+      );
+      setProvisioned(result);
       await refreshPlatform();
       setForm({
         name: "",
@@ -224,79 +227,55 @@ export default function SuperAdminConsole({
         description: "",
         ownerName: "",
         ownerEmail: "",
-        ownerPassword: "",
         plan: "Growth",
         currency: "SAR",
         primaryColor: "#c8a66a",
         branchName: "Main Branch",
         customDomain: "",
       });
-    } catch {
-      setCreateError("Network error while creating restaurant.");
+    } catch (err) {
+      setCreateError(
+        err instanceof Error ? err.message : "Failed to provision restaurant."
+      );
     } finally {
       setCreating(false);
     }
   }
 
   async function togglePublish(row: AdminRestaurantRow) {
-    const res = await fetch(`/api/restaurants/${row.slug}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        isPublished: !row.isPublished,
-        status: !row.isPublished ? "Active" : "Setup",
-      }),
+    const nextPublished = !row.isPublished;
+    await updateRestaurantAdmin(row.slug, {
+      isPublished: nextPublished,
+      status: nextPublished ? "Active" : "Setup",
     });
-    if (res.ok) {
-      await refreshPlatform();
-    }
+    await refreshPlatform();
   }
 
   async function updatePlan(slug: string, plan: PlanTier) {
-    const res = await fetch(`/api/restaurants/${slug}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan }),
-    });
-    if (res.ok) {
-      await refreshPlatform();
-    }
+    await updateRestaurantAdmin(slug, { plan });
+    await refreshPlatform();
   }
 
   async function updateStatus(slug: string, status: TenantStatus) {
-    const res = await fetch(`/api/restaurants/${slug}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        status,
-        isPublished: status === "Active",
-      }),
+    await updateRestaurantAdmin(slug, {
+      status,
+      isPublished: status === "Active",
     });
-    if (res.ok) {
-      await refreshPlatform();
-    }
+    await refreshPlatform();
   }
 
   async function deleteRestaurant(slug: string) {
-    const res = await fetch(`/api/restaurants/${slug}`, { method: "DELETE" });
-    if (res.ok) {
-      await refreshPlatform();
-    }
+    await deleteRestaurantCascade(slug);
+    await refreshPlatform();
   }
 
   async function handleAddPlatformMember(e: React.FormEvent) {
     e.preventDefault();
     setTeamSaving(true);
     try {
-      const res = await fetch("/api/platform", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(teamForm),
-      });
-      if (res.ok) {
-        setTeamForm({ fullName: "", email: "", platformRole: "support" });
-        await refreshPlatform();
-      }
+      await addPlatformOperator(teamForm);
+      setTeamForm({ fullName: "", email: "", platformRole: "support" });
+      await refreshPlatform();
     } finally {
       setTeamSaving(false);
     }
@@ -307,24 +286,17 @@ export default function SuperAdminConsole({
     setSettingsSaving(true);
     setSettingsSavedMsg("");
     try {
-      const res = await fetch("/api/platform", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      });
-      if (res.ok) {
-        setSettingsSavedMsg("Platform settings saved.");
-        setTimeout(() => setSettingsSavedMsg(""), 2500);
-      }
+      await savePlatformSettingsInFirestore(settings);
+      setSettingsSavedMsg("Platform settings saved to Firestore.");
+      setTimeout(() => setSettingsSavedMsg(""), 2500);
     } finally {
       setSettingsSaving(false);
     }
   }
 
   async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await signOutUser();
     router.push("/login");
-    router.refresh();
   }
 
   const navItems: Array<{ id: AdminTab; label: string; icon: typeof LayoutDashboard }> = [
@@ -1091,12 +1063,19 @@ export default function SuperAdminConsole({
 
                 <div className="rounded-xl border border-[#252d2b] bg-[#0d1010] p-4 text-xs">
                   <p className="font-medium text-[#f5f5f1]">
-                    Storage & Supabase integration status
+                    Firebase Firestore &amp; Auth status
                   </p>
                   <p className="muted mt-1 leading-5">
-                    {initialData.supabaseConfigured
-                      ? "Supabase environment variables detected. PostgreSQL schema ready in supabase/schema.sql."
-                      : "Running with persistent local multi-tenant server storage. Add NEXT_PUBLIC_SUPABASE_URL & NEXT_PUBLIC_SUPABASE_ANON_KEY to connect an external Supabase project."}
+                    Connected to Firebase project{" "}
+                    <span className="font-mono-num text-[#f5f5f1]">
+                      {firebaseConfig.projectId}
+                    </span>{" "}
+                    (Database:{" "}
+                    <span className="font-mono-num text-[#c8a66a]">
+                      {firebaseConfig.firestoreDatabaseId}
+                    </span>
+                    ). Multi-tenant isolation enforced via Firestore security
+                    rules.
                   </p>
                 </div>
 
@@ -1214,15 +1193,14 @@ export default function SuperAdminConsole({
                     </div>
 
                     <div className="border-t border-[#252d2b] pt-3">
-                      <span className="muted">Owner sign-in credentials</span>
+                      <span className="muted">Authorized Google account</span>
                       <p className="font-mono-num mt-1 text-[#f5f5f1]">
-                        Email: {provisioned.ownerEmail}
+                        Owner Email: {provisioned.ownerEmail}
                       </p>
-                      {provisioned.temporaryPassword && (
-                        <p className="font-mono-num mt-0.5 text-[#86efac]">
-                          Password: {provisioned.temporaryPassword}
-                        </p>
-                      )}
+                      <p className="mt-0.5 text-[11px] text-[#86efac]">
+                        Pre-invited: signing in with Google using this email
+                        automatically claims dashboard admin access.
+                      </p>
                     </div>
                   </div>
 
@@ -1230,11 +1208,7 @@ export default function SuperAdminConsole({
                     <button
                       type="button"
                       onClick={() => {
-                        const msg = `Welcome to QLUB!\nDashboard: ${origin}${provisioned.dashboardPath}\nPublic Menu: ${origin}${provisioned.publicMenuPath}\nEmail: ${provisioned.ownerEmail}${
-                          provisioned.temporaryPassword
-                            ? `\nTemporary Password: ${provisioned.temporaryPassword}`
-                            : ""
-                        }`;
+                        const msg = `Welcome to QLUB!\nDashboard: ${origin}${provisioned.dashboardPath}\nPublic Menu: ${origin}${provisioned.publicMenuPath}\nAuthorized Google Email: ${provisioned.ownerEmail}`;
                         copyText("all", msg);
                       }}
                       className="rounded-full border border-[#39413e] px-5 py-2.5 text-xs font-medium"

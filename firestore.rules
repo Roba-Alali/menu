@@ -1,0 +1,453 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Boot-time connectivity check path
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // --- Helper Primitives ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootPlatformAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'robaalali86@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootPlatformAdmin() || (
+        isVerifiedUser() && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid))
+      );
+    }
+
+    function isRestaurantMember(slug) {
+      return isVerifiedUser() && (
+        get(/databases/$(database)/documents/restaurants/$(slug)).data.ownerUid == request.auth.uid ||
+        exists(/databases/$(database)/documents/restaurants/$(slug)/members/$(request.auth.uid))
+      );
+    }
+
+    function isRestaurantWriter(slug) {
+      return isAdmin() || isRestaurantMember(slug);
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 'fullName', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'fullName', 'createdAt']) &&
+        isValidId(data.uid) &&
+        data.uid == request.auth.uid &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+        data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 120 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidPlatformAdmin(data) {
+      return data.keys().hasAll(['uid', 'email', 'fullName', 'platformRole', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'fullName', 'platformRole', 'createdAt']) &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+        data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 120 &&
+        data.platformRole in ['owner', 'support'] &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidPlatformSettings(data) {
+      return data.keys().hasAll(['platformName', 'supportEmail', 'defaultCnameTarget', 'allowSelfServiceOrdering', 'defaultCurrency', 'updatedAt']) &&
+        data.keys().hasOnly(['platformName', 'supportEmail', 'defaultCnameTarget', 'allowSelfServiceOrdering', 'defaultCurrency', 'updatedAt']) &&
+        data.platformName is string && data.platformName.size() >= 1 && data.platformName.size() <= 120 &&
+        data.supportEmail is string && data.supportEmail.size() >= 3 && data.supportEmail.size() <= 200 &&
+        data.defaultCnameTarget is string && data.defaultCnameTarget.size() >= 3 && data.defaultCnameTarget.size() <= 200 &&
+        data.allowSelfServiceOrdering is bool &&
+        data.defaultCurrency in ['SAR', 'AED', 'USD', 'EUR'] &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidRestaurant(data) {
+      return data.keys().hasAll(['id', 'name', 'nameAr', 'slug', 'description', 'descriptionAr', 'logoText', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'plan', 'status', 'ownerUid', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'name', 'nameAr', 'slug', 'description', 'descriptionAr', 'logoText', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'plan', 'status', 'ownerUid', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+        data.nameAr is string && data.nameAr.size() <= 120 &&
+        isValidId(data.slug) && data.slug.size() <= 100 &&
+        data.description is string && data.description.size() <= 500 &&
+        data.descriptionAr is string && data.descriptionAr.size() <= 500 &&
+        data.logoText is string && data.logoText.size() >= 1 && data.logoText.size() <= 4 &&
+        data.coverUrl is string && data.coverUrl.size() <= 500 &&
+        data.primaryColor is string && data.primaryColor.size() >= 4 && data.primaryColor.size() <= 20 &&
+        data.secondaryColor is string && data.secondaryColor.size() >= 4 && data.secondaryColor.size() <= 20 &&
+        data.currency in ['SAR', 'AED', 'USD', 'EUR'] &&
+        data.defaultLocale in ['en', 'ar'] &&
+        data.isPublished is bool &&
+        data.plan in ['Starter', 'Growth', 'Enterprise'] &&
+        data.status in ['Active', 'Setup', 'Suspended'] &&
+        data.ownerUid is string && data.ownerUid.size() <= 128 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidMember(data) {
+      return data.keys().hasAll(['restaurantId', 'userId', 'email', 'fullName', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['restaurantId', 'userId', 'email', 'fullName', 'role', 'createdAt', 'claimedFromId']) &&
+        isValidId(data.restaurantId) &&
+        data.userId is string && data.userId.size() <= 128 &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+        data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 120 &&
+        data.role in ['admin', 'manager', 'editor', 'staff'] &&
+        (!('claimedFromId' in data) || isValidId(data.claimedFromId)) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidBranch(data) {
+      return data.keys().hasAll(['id', 'restaurantId', 'name', 'address', 'phone', 'isActive', 'isPublic', 'ownerUid', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'restaurantId', 'name', 'address', 'phone', 'isActive', 'isPublic', 'ownerUid', 'createdAt']) &&
+        isValidId(data.id) &&
+        isValidId(data.restaurantId) &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+        data.address is string && data.address.size() <= 300 &&
+        data.phone is string && data.phone.size() <= 40 &&
+        data.isActive is bool &&
+        data.isPublic is bool &&
+        data.ownerUid is string && data.ownerUid.size() <= 128 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['id', 'restaurantId', 'name', 'nameAr', 'description', 'sortOrder', 'isActive', 'isPublic', 'ownerUid', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'restaurantId', 'name', 'nameAr', 'description', 'sortOrder', 'isActive', 'isPublic', 'ownerUid', 'createdAt']) &&
+        isValidId(data.id) &&
+        isValidId(data.restaurantId) &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+        data.nameAr is string && data.nameAr.size() <= 120 &&
+        data.description is string && data.description.size() <= 300 &&
+        data.sortOrder is number &&
+        data.isActive is bool &&
+        data.isPublic is bool &&
+        data.ownerUid is string && data.ownerUid.size() <= 128 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['id', 'restaurantId', 'categoryId', 'name', 'nameAr', 'description', 'descriptionAr', 'imageUrl', 'price', 'compareAtPrice', 'isAvailable', 'isFeatured', 'sortOrder', 'allergens', 'options', 'isPublic', 'ownerUid', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'restaurantId', 'categoryId', 'name', 'nameAr', 'description', 'descriptionAr', 'imageUrl', 'price', 'compareAtPrice', 'isAvailable', 'isFeatured', 'sortOrder', 'allergens', 'options', 'isPublic', 'ownerUid', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) &&
+        isValidId(data.restaurantId) &&
+        (data.categoryId == null || (data.categoryId is string && data.categoryId.size() <= 128)) &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 140 &&
+        data.nameAr is string && data.nameAr.size() <= 140 &&
+        data.description is string && data.description.size() <= 500 &&
+        data.descriptionAr is string && data.descriptionAr.size() <= 500 &&
+        data.imageUrl is string && data.imageUrl.size() <= 500 &&
+        data.price is number && data.price >= 0 &&
+        (data.compareAtPrice == null || (data.compareAtPrice is number && data.compareAtPrice >= 0)) &&
+        data.isAvailable is bool &&
+        data.isFeatured is bool &&
+        data.sortOrder is number &&
+        data.allergens is list && data.allergens.size() <= 15 && (data.allergens.size() == 0 || data.allergens[0] is string) &&
+        data.options is list && data.options.size() <= 15 && (data.options.size() == 0 || data.options[0] is map) &&
+        data.isPublic is bool &&
+        data.ownerUid is string && data.ownerUid.size() <= 128 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidQrCode(data) {
+      return data.keys().hasAll(['id', 'restaurantId', 'branchId', 'label', 'targetPath', 'token', 'isActive', 'ownerUid', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'restaurantId', 'branchId', 'label', 'targetPath', 'token', 'isActive', 'ownerUid', 'createdAt']) &&
+        isValidId(data.id) &&
+        isValidId(data.restaurantId) &&
+        (data.branchId == null || (data.branchId is string && data.branchId.size() <= 128)) &&
+        data.label is string && data.label.size() >= 1 && data.label.size() <= 120 &&
+        data.targetPath is string && data.targetPath.size() >= 1 && data.targetPath.size() <= 300 &&
+        data.token is string && data.token.size() >= 1 && data.token.size() <= 120 &&
+        data.isActive is bool &&
+        data.ownerUid is string && data.ownerUid.size() <= 128 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidDomain(data) {
+      return data.keys().hasAll(['id', 'restaurantId', 'hostname', 'isVerified', 'ownerUid', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'restaurantId', 'hostname', 'isVerified', 'ownerUid', 'createdAt']) &&
+        isValidId(data.id) &&
+        isValidId(data.restaurantId) &&
+        data.hostname is string && data.hostname.size() >= 3 && data.hostname.size() <= 200 &&
+        data.isVerified is bool &&
+        data.ownerUid is string && data.ownerUid.size() <= 128 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['id', 'restaurantId', 'branchId', 'orderNumber', 'customerName', 'customerPhone', 'tableLabel', 'orderType', 'status', 'currency', 'subtotal', 'total', 'notes', 'items', 'ownerUid', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'restaurantId', 'branchId', 'orderNumber', 'customerName', 'customerPhone', 'tableLabel', 'orderType', 'status', 'currency', 'subtotal', 'total', 'notes', 'items', 'ownerUid', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) &&
+        isValidId(data.restaurantId) &&
+        (data.branchId == null || (data.branchId is string && data.branchId.size() <= 128)) &&
+        data.orderNumber is number && data.orderNumber > 0 &&
+        data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 120 &&
+        data.customerPhone is string && data.customerPhone.size() <= 40 &&
+        data.tableLabel is string && data.tableLabel.size() <= 60 &&
+        data.orderType in ['dine_in', 'pickup'] &&
+        data.status in ['pending', 'accepted', 'preparing', 'ready', 'completed', 'cancelled'] &&
+        data.currency in ['SAR', 'AED', 'USD', 'EUR'] &&
+        data.subtotal is number && data.subtotal >= 0 &&
+        data.total is number && data.total >= 0 &&
+        data.notes is string && data.notes.size() <= 400 &&
+        data.items is list && data.items.size() >= 1 && data.items.size() <= 50 && data.items[0] is map &&
+        data.ownerUid is string && data.ownerUid.size() <= 128 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isVerifiedUser() && isValidId(userId) && request.auth.uid == userId &&
+        isValidUserProfile(incoming()) && incoming().createdAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(userId) && request.auth.uid == userId &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['fullName']);
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    match /platformAdmins/{uid} {
+      allow get: if isSignedIn() && isValidId(uid) && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(uid) && isValidPlatformAdmin(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidId(uid) && isValidPlatformAdmin(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'platformRole']);
+      allow delete: if isAdmin() && isValidId(uid);
+    }
+
+    match /platformSettings/{settingId} {
+      allow get: if isSignedIn() && isValidId(settingId);
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(settingId) && isValidPlatformSettings(incoming()) && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(settingId) && isValidPlatformSettings(incoming()) &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['platformName', 'supportEmail', 'defaultCnameTarget', 'allowSelfServiceOrdering', 'defaultCurrency', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    match /restaurants/{slug} {
+      allow get: if isValidId(slug) && (
+        existing().isPublished == true || isAdmin() || isRestaurantMember(slug)
+      );
+      allow list: if existing().isPublished == true || isAdmin() || (
+        isVerifiedUser() && existing().ownerUid == request.auth.uid
+      );
+      allow create: if isAdmin() && isValidId(slug) && isValidRestaurant(incoming()) &&
+        incoming().slug == slug &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(slug) && isValidRestaurant(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().slug == existing().slug &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nameAr', 'description', 'descriptionAr', 'logoText', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'plan', 'status', 'ownerUid', 'updatedAt'])) ||
+          (isRestaurantMember(slug) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nameAr', 'description', 'descriptionAr', 'logoText', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'ownerUid', 'updatedAt']))
+        );
+      allow delete: if isAdmin() && isValidId(slug);
+
+      match /members/{memberId} {
+        allow get: if isValidId(slug) && isValidId(memberId) && (
+          isAdmin() ||
+          (isVerifiedUser() && (existing().userId == request.auth.uid || existing().email == request.auth.token.email)) ||
+          isRestaurantMember(slug)
+        );
+        allow list: if isRestaurantWriter(slug) || (
+          isVerifiedUser() && (existing().userId == request.auth.uid || existing().email == request.auth.token.email)
+        );
+        allow create: if isValidId(slug) && isValidId(memberId) && isValidMember(incoming()) &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/restaurants/$(slug)) && (
+            isRestaurantWriter(slug) ||
+            (
+              isVerifiedUser() &&
+              memberId == request.auth.uid &&
+              incoming().userId == request.auth.uid &&
+              incoming().email == request.auth.token.email &&
+              ('claimedFromId' in incoming()) &&
+              exists(/databases/$(database)/documents/restaurants/$(slug)/members/$(incoming().claimedFromId)) &&
+              get(/databases/$(database)/documents/restaurants/$(slug)/members/$(incoming().claimedFromId)).data.email == request.auth.token.email &&
+              get(/databases/$(database)/documents/restaurants/$(slug)/members/$(incoming().claimedFromId)).data.role == incoming().role
+            )
+          );
+        allow update: if isValidId(slug) && isValidId(memberId) && isValidMember(incoming()) &&
+          incoming().restaurantId == existing().restaurantId &&
+          incoming().createdAt == existing().createdAt && (
+            (isRestaurantWriter(slug) && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'fullName', 'userId'])) ||
+            (isVerifiedUser() && existing().email == request.auth.token.email && incoming().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['userId']))
+          );
+        allow delete: if isValidId(slug) && isValidId(memberId) && isRestaurantWriter(slug);
+      }
+
+      match /branches/{branchId} {
+        allow get: if isValidId(slug) && isValidId(branchId) && (
+          existing().isPublic == true || isRestaurantWriter(slug)
+        );
+        allow list: if existing().isPublic == true || isRestaurantWriter(slug) || (
+          isVerifiedUser() && existing().ownerUid == request.auth.uid
+        );
+        allow create: if isValidId(slug) && isValidId(branchId) && isValidBranch(incoming()) &&
+          incoming().id == branchId &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/restaurants/$(slug)) &&
+          isRestaurantWriter(slug);
+        allow update: if isValidId(slug) && isValidId(branchId) && isValidBranch(incoming()) &&
+          incoming().id == existing().id &&
+          incoming().restaurantId == existing().restaurantId &&
+          incoming().createdAt == existing().createdAt &&
+          isRestaurantWriter(slug) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'address', 'phone', 'isActive', 'isPublic', 'ownerUid']);
+        allow delete: if isValidId(slug) && isValidId(branchId) && isRestaurantWriter(slug);
+      }
+
+      match /categories/{categoryId} {
+        allow get: if isValidId(slug) && isValidId(categoryId) && (
+          existing().isPublic == true || isRestaurantWriter(slug)
+        );
+        allow list: if existing().isPublic == true || isRestaurantWriter(slug) || (
+          isVerifiedUser() && existing().ownerUid == request.auth.uid
+        );
+        allow create: if isValidId(slug) && isValidId(categoryId) && isValidCategory(incoming()) &&
+          incoming().id == categoryId &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/restaurants/$(slug)) &&
+          isRestaurantWriter(slug);
+        allow update: if isValidId(slug) && isValidId(categoryId) && isValidCategory(incoming()) &&
+          incoming().id == existing().id &&
+          incoming().restaurantId == existing().restaurantId &&
+          incoming().createdAt == existing().createdAt &&
+          isRestaurantWriter(slug) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nameAr', 'description', 'sortOrder', 'isActive', 'isPublic', 'ownerUid']);
+        allow delete: if isValidId(slug) && isValidId(categoryId) && isRestaurantWriter(slug);
+      }
+
+      match /products/{productId} {
+        allow get: if isValidId(slug) && isValidId(productId) && (
+          existing().isPublic == true || isRestaurantWriter(slug)
+        );
+        allow list: if existing().isPublic == true || isRestaurantWriter(slug) || (
+          isVerifiedUser() && existing().ownerUid == request.auth.uid
+        );
+        allow create: if isValidId(slug) && isValidId(productId) && isValidProduct(incoming()) &&
+          incoming().id == productId &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          exists(/databases/$(database)/documents/restaurants/$(slug)) &&
+          isRestaurantWriter(slug);
+        allow update: if isValidId(slug) && isValidId(productId) && isValidProduct(incoming()) &&
+          incoming().id == existing().id &&
+          incoming().restaurantId == existing().restaurantId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          isRestaurantWriter(slug) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['categoryId', 'name', 'nameAr', 'description', 'descriptionAr', 'imageUrl', 'price', 'compareAtPrice', 'isAvailable', 'isFeatured', 'sortOrder', 'allergens', 'options', 'isPublic', 'ownerUid', 'updatedAt']);
+        allow delete: if isValidId(slug) && isValidId(productId) && isRestaurantWriter(slug);
+      }
+
+      match /qrCodes/{qrId} {
+        allow get: if isValidId(slug) && isValidId(qrId) && isRestaurantWriter(slug);
+        allow list: if isRestaurantWriter(slug) || (
+          isVerifiedUser() && existing().ownerUid == request.auth.uid
+        );
+        allow create: if isValidId(slug) && isValidId(qrId) && isValidQrCode(incoming()) &&
+          incoming().id == qrId &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/restaurants/$(slug)) &&
+          isRestaurantWriter(slug);
+        allow update: if isValidId(slug) && isValidId(qrId) && isValidQrCode(incoming()) &&
+          incoming().id == existing().id &&
+          incoming().restaurantId == existing().restaurantId &&
+          incoming().createdAt == existing().createdAt &&
+          isRestaurantWriter(slug) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['label', 'branchId', 'targetPath', 'isActive', 'ownerUid']);
+        allow delete: if isValidId(slug) && isValidId(qrId) && isRestaurantWriter(slug);
+      }
+
+      match /domains/{domainId} {
+        allow get: if isValidId(slug) && isValidId(domainId) && isRestaurantWriter(slug);
+        allow list: if isRestaurantWriter(slug) || (
+          isVerifiedUser() && existing().ownerUid == request.auth.uid
+        );
+        allow create: if isValidId(slug) && isValidId(domainId) && isValidDomain(incoming()) &&
+          incoming().id == domainId &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/restaurants/$(slug)) &&
+          isRestaurantWriter(slug);
+        allow update: if isValidId(slug) && isValidId(domainId) && isValidDomain(incoming()) &&
+          incoming().id == existing().id &&
+          incoming().restaurantId == existing().restaurantId &&
+          incoming().createdAt == existing().createdAt &&
+          isRestaurantWriter(slug) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['hostname', 'isVerified', 'ownerUid']);
+        allow delete: if isValidId(slug) && isValidId(domainId) && isRestaurantWriter(slug);
+      }
+
+      match /orders/{orderId} {
+        allow get: if isValidId(slug) && isValidId(orderId) && isRestaurantWriter(slug);
+        allow list: if isRestaurantWriter(slug) || (
+          isVerifiedUser() && existing().ownerUid == request.auth.uid
+        );
+        allow create: if isValidId(slug) && isValidId(orderId) && isValidOrder(incoming()) &&
+          incoming().id == orderId &&
+          incoming().status == 'pending' &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          exists(/databases/$(database)/documents/restaurants/$(slug)) &&
+          get(/databases/$(database)/documents/restaurants/$(slug)).data.isPublished == true &&
+          incoming().ownerUid == get(/databases/$(database)/documents/restaurants/$(slug)).data.ownerUid;
+        allow update: if isValidId(slug) && isValidId(orderId) && isValidOrder(incoming()) &&
+          incoming().id == existing().id &&
+          incoming().restaurantId == existing().restaurantId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            isAdmin() ||
+            (
+              isRestaurantWriter(slug) &&
+              !(existing().status in ['completed', 'cancelled']) &&
+              incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'ownerUid'])
+            )
+          );
+        allow delete: if isAdmin() && isValidId(slug) && isValidId(orderId);
+      }
+    }
+
+    // Support collectionGroup('members') query for finding all restaurants a signed-in user belongs to
+    match /{path=**}/members/{memberId} {
+      allow list: if isAdmin() || (
+        isVerifiedUser() && (existing().userId == request.auth.uid || existing().email == request.auth.token.email)
+      );
+    }
+  }
+}

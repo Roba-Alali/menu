@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import { fetchLandingPreviewData } from "@/lib/firestore-service";
 import type { Restaurant } from "@/lib/types";
 
 interface PreviewTenant {
@@ -16,11 +17,35 @@ interface PreviewTenant {
 }
 
 export default function LandingPreview({
-  tenants,
+  tenants: initialTenants,
 }: {
   tenants: PreviewTenant[];
 }) {
-  const [selectedSlug, setSelectedSlug] = useState(tenants[0]?.restaurant.slug || "the-house");
+  const [tenants, setTenants] = useState<PreviewTenant[]>(initialTenants);
+  const [selectedSlug, setSelectedSlug] = useState(
+    initialTenants[0]?.restaurant.slug || "the-house"
+  );
+
+  useEffect(() => {
+    let active = true;
+    fetchLandingPreviewData()
+      .then((res) => {
+        if (!active || !res.tenants.length) return;
+        setTenants(res.tenants);
+        setSelectedSlug((prev) =>
+          res.tenants.some((t) => t.restaurant.slug === prev)
+            ? prev
+            : res.tenants[0].restaurant.slug
+        );
+      })
+      .catch(() => {
+        // Keep starter preview if unseeded or offline
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const current = tenants.find((t) => t.restaurant.slug === selectedSlug) || tenants[0];
 
   if (!current) return null;

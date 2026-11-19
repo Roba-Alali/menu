@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import AuthProvider from "@/components/AuthProviderWrapper";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -35,7 +36,7 @@ export default function RootLayout({
       className={`${jakarta.variable} ${cormorant.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen antialiased selection:bg-[#c8a66a]/25 selection:text-[#f5f5f1]">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

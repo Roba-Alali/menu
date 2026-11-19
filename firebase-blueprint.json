@@ -1,0 +1,255 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user account profile without self-assigned roles.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 200 },
+        "fullName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "fullName", "createdAt"]
+    },
+    "PlatformAdmin": {
+      "title": "PlatformAdmin",
+      "description": "Platform operator record managed exclusively by platform owners.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 200 },
+        "fullName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "platformRole": { "type": "string", "enum": ["owner", "support"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "fullName", "platformRole", "createdAt"]
+    },
+    "PlatformSettings": {
+      "title": "PlatformSettings",
+      "description": "Global platform configuration defaults.",
+      "type": "object",
+      "properties": {
+        "platformName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "supportEmail": { "type": "string", "format": "email", "maxLength": 200 },
+        "defaultCnameTarget": { "type": "string", "minLength": 3, "maxLength": 200 },
+        "allowSelfServiceOrdering": { "type": "boolean" },
+        "defaultCurrency": { "type": "string", "enum": ["SAR", "AED", "USD", "EUR"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["platformName", "supportEmail", "defaultCnameTarget", "allowSelfServiceOrdering", "defaultCurrency", "updatedAt"]
+    },
+    "Restaurant": {
+      "title": "Restaurant",
+      "description": "Multi-tenant restaurant brand, storefront theme, and lifecycle state.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "nameAr": { "type": "string", "maxLength": 120 },
+        "slug": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[a-z0-9\\-]+$" },
+        "description": { "type": "string", "maxLength": 500 },
+        "descriptionAr": { "type": "string", "maxLength": 500 },
+        "logoText": { "type": "string", "minLength": 1, "maxLength": 4 },
+        "coverUrl": { "type": "string", "maxLength": 500 },
+        "primaryColor": { "type": "string", "maxLength": 20 },
+        "secondaryColor": { "type": "string", "maxLength": 20 },
+        "currency": { "type": "string", "enum": ["SAR", "AED", "USD", "EUR"] },
+        "defaultLocale": { "type": "string", "enum": ["en", "ar"] },
+        "isPublished": { "type": "boolean" },
+        "plan": { "type": "string", "enum": ["Starter", "Growth", "Enterprise"] },
+        "status": { "type": "string", "enum": ["Active", "Setup", "Suspended"] },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "ownerEmail": { "type": "string", "format": "email", "maxLength": 200 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "slug", "logoText", "primaryColor", "secondaryColor", "currency", "defaultLocale", "isPublished", "plan", "status", "ownerEmail", "createdAt", "updatedAt"]
+    },
+    "RestaurantMember": {
+      "title": "RestaurantMember",
+      "description": "Restaurant staff and RBAC role assignment.",
+      "type": "object",
+      "properties": {
+        "restaurantId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 200 },
+        "fullName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "role": { "type": "string", "enum": ["admin", "manager", "editor", "staff"] },
+        "claimedFromId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["restaurantId", "userId", "email", "fullName", "role", "createdAt"]
+    },
+    "Branch": {
+      "title": "Branch",
+      "description": "Physical branch location of a restaurant.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "restaurantId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "address": { "type": "string", "maxLength": 300 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "isActive": { "type": "boolean" },
+        "isPublic": { "type": "boolean" },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "ownerEmail": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "restaurantId", "name", "isActive", "isPublic", "ownerEmail", "createdAt"]
+    },
+    "MenuCategory": {
+      "title": "MenuCategory",
+      "description": "Bilingual menu category for a restaurant.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "restaurantId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "nameAr": { "type": "string", "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 300 },
+        "sortOrder": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "isPublic": { "type": "boolean" },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "ownerEmail": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "restaurantId", "name", "sortOrder", "isActive", "isPublic", "ownerEmail", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Restaurant dish with pricing, imagery, allergens, and modifier groups.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "restaurantId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "categoryId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "nameAr": { "type": "string", "maxLength": 140 },
+        "description": { "type": "string", "maxLength": 500 },
+        "descriptionAr": { "type": "string", "maxLength": 500 },
+        "imageUrl": { "type": "string", "maxLength": 500 },
+        "price": { "type": "number" },
+        "compareAtPrice": { "type": "number" },
+        "isAvailable": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "sortOrder": { "type": "number" },
+        "allergens": { "type": "array" },
+        "options": { "type": "array" },
+        "isPublic": { "type": "boolean" },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "ownerEmail": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "restaurantId", "name", "price", "isAvailable", "isFeatured", "sortOrder", "allergens", "options", "isPublic", "ownerEmail", "createdAt", "updatedAt"]
+    },
+    "QrCodeRecord": {
+      "title": "QrCodeRecord",
+      "description": "Dynamic QR entry point linked to a restaurant branch or table.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "restaurantId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "branchId": { "type": "string", "maxLength": 128 },
+        "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "targetPath": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "token": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "isActive": { "type": "boolean" },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "ownerEmail": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "restaurantId", "label", "targetPath", "token", "isActive", "ownerEmail", "createdAt"]
+    },
+    "RestaurantDomain": {
+      "title": "RestaurantDomain",
+      "description": "Custom domain mapping for a restaurant.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "restaurantId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "hostname": { "type": "string", "minLength": 3, "maxLength": 200 },
+        "isVerified": { "type": "boolean" },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "ownerEmail": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "restaurantId", "hostname", "isVerified", "ownerEmail", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer dine-in or pickup order submitted to a restaurant.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "restaurantId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "branchId": { "type": "string", "maxLength": 128 },
+        "orderNumber": { "type": "number" },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "customerPhone": { "type": "string", "maxLength": 40 },
+        "tableLabel": { "type": "string", "maxLength": 60 },
+        "orderType": { "type": "string", "enum": ["dine_in", "pickup"] },
+        "status": { "type": "string", "enum": ["pending", "accepted", "preparing", "ready", "completed", "cancelled"] },
+        "currency": { "type": "string", "enum": ["SAR", "AED", "USD", "EUR"] },
+        "subtotal": { "type": "number" },
+        "total": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 400 },
+        "items": { "type": "array" },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "ownerEmail": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "restaurantId", "orderNumber", "customerName", "orderType", "status", "currency", "subtotal", "total", "items", "ownerEmail", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile isolated to the authenticated owner."
+    },
+    "/platformAdmins/{uid}": {
+      "schema": { "$ref": "#/entities/PlatformAdmin" },
+      "description": "Platform operators (owner/support) managed by platform owners."
+    },
+    "/platformSettings/{settingId}": {
+      "schema": { "$ref": "#/entities/PlatformSettings" },
+      "description": "Global platform configuration."
+    },
+    "/restaurants/{slug}": {
+      "schema": { "$ref": "#/entities/Restaurant" },
+      "description": "Multi-tenant restaurant documents keyed by unique URL slug."
+    },
+    "/restaurants/{slug}/members/{memberId}": {
+      "schema": { "$ref": "#/entities/RestaurantMember" },
+      "description": "Restaurant team members and roles."
+    },
+    "/restaurants/{slug}/branches/{branchId}": {
+      "schema": { "$ref": "#/entities/Branch" },
+      "description": "Restaurant branches."
+    },
+    "/restaurants/{slug}/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/MenuCategory" },
+      "description": "Restaurant menu categories."
+    },
+    "/restaurants/{slug}/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Restaurant menu products and modifier groups."
+    },
+    "/restaurants/{slug}/qrCodes/{qrId}": {
+      "schema": { "$ref": "#/entities/QrCodeRecord" },
+      "description": "Restaurant dynamic QR code entries."
+    },
+    "/restaurants/{slug}/domains/{domainId}": {
+      "schema": { "$ref": "#/entities/RestaurantDomain" },
+      "description": "Restaurant custom domains."
+    },
+    "/restaurants/{slug}/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Customer orders containing PII restricted to restaurant staff and platform admins."
+    }
+  }
+}

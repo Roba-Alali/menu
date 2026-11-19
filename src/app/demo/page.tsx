@@ -1,18 +1,58 @@
+"use client";
+
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
 import PublicRestaurantMenu from "@/components/menu/PublicRestaurantMenu";
-import { getRestaurantBundle } from "@/lib/store";
+import { fetchPublicRestaurantMenu } from "@/lib/firestore-service";
+import type { Branch, MenuCategory, Product, Restaurant } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
+function DemoContent() {
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("tenant") || "the-house";
+  const branchParam = searchParams.get("branch") || undefined;
+  const tableParam = searchParams.get("table") || undefined;
 
-export default async function DemoPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ tenant?: string; branch?: string; table?: string }>;
-}) {
-  const query = await searchParams;
-  const slug = query.tenant || "the-house";
-  const bundle = getRestaurantBundle(slug) || getRestaurantBundle("the-house");
+  const { publicUser, isAuthReady } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [menuData, setMenuData] = useState<{
+    restaurant: Restaurant;
+    branches: Branch[];
+    categories: MenuCategory[];
+    products: Product[];
+    isFallbackPreview: boolean;
+  } | null>(null);
 
-  if (!bundle) {
+  useEffect(() => {
+    if (!isAuthReady) return;
+    let active = true;
+    setLoading(true);
+    fetchPublicRestaurantMenu(slug, Boolean(publicUser))
+      .then(async (res) => {
+        if (res || slug === "the-house") return res;
+        return fetchPublicRestaurantMenu("the-house", Boolean(publicUser));
+      })
+      .then((res) => {
+        if (!active) return;
+        setMenuData(res);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [slug, isAuthReady, publicUser]);
+
+  if (loading || !isAuthReady) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#090b0b] text-sm text-[#9aa6a1]">
+        Loading demo restaurant...
+      </main>
+    );
+  }
+
+  if (!menuData) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#090b0b] text-sm text-[#9aa6a1]">
         Demo restaurant unavailable.
@@ -22,12 +62,27 @@ export default async function DemoPage({
 
   return (
     <PublicRestaurantMenu
-      restaurant={bundle.restaurant}
-      branches={bundle.branches.filter((b) => b.isActive)}
-      categories={bundle.categories}
-      products={bundle.products}
-      initialBranchId={query.branch}
-      initialTable={query.table}
+      restaurant={menuData.restaurant}
+      branches={menuData.branches}
+      categories={menuData.categories}
+      products={menuData.products}
+      initialBranchId={branchParam}
+      initialTable={tableParam}
+      isFallbackPreview={menuData.isFallbackPreview}
     />
+  );
+}
+
+export default function DemoPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="grid min-h-screen place-items-center bg-[#090b0b] text-sm text-[#9aa6a1]">
+          Loading demo restaurant...
+        </main>
+      }
+    >
+      <DemoContent />
+    </Suspense>
   );
 }

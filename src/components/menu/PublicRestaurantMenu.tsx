@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import DishImage from "@/components/DishImage";
+import { placePublicOrderInFirestore } from "@/lib/firestore-service";
 import type {
   Branch,
   LocaleCode,
@@ -39,6 +40,7 @@ export default function PublicRestaurantMenu({
   products,
   initialBranchId,
   initialTable,
+  isFallbackPreview = false,
 }: {
   restaurant: Restaurant;
   branches: Branch[];
@@ -46,6 +48,7 @@ export default function PublicRestaurantMenu({
   products: Product[];
   initialBranchId?: string;
   initialTable?: string;
+  isFallbackPreview?: boolean;
 }) {
   const [locale, setLocale] = useState<LocaleCode>(restaurant.defaultLocale || "en");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
@@ -220,37 +223,38 @@ export default function PublicRestaurantMenu({
   async function handleCheckout(e: React.FormEvent) {
     e.preventDefault();
     if (!cart.length) return;
+    if (isFallbackPreview) {
+      setOrderError(
+        isAr
+          ? "وضع المعاينة الأولية: يرجى تسجيل الدخول إلى لوحة الإدارة (/admin) لتهيئة قاعدة بيانات Firestore أولاً."
+          : "Preview mode: Sign in to Super Admin (/admin) once to initialize your Firestore catalog before submitting live orders."
+      );
+      return;
+    }
     setOrderError("");
     setSubmitting(true);
     try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          restaurantId: restaurant.id,
-          branchId: branchId || null,
-          customerName,
-          customerPhone,
-          tableLabel: orderType === "pickup" ? "Pickup" : tableLabel,
-          orderType,
-          notes,
-          items: cart.map((c) => ({
-            productId: c.product.id,
-            quantity: c.quantity,
-            selectedOptionValueIds: c.selectedOptionValueIds,
-          })),
-        }),
+      const order = await placePublicOrderInFirestore({
+        restaurant,
+        products,
+        branchId: branchId || null,
+        customerName,
+        customerPhone,
+        tableLabel: orderType === "pickup" ? "Pickup" : tableLabel,
+        orderType,
+        notes,
+        items: cart.map((c) => ({
+          productId: c.product.id,
+          quantity: c.quantity,
+          selectedOptionValueIds: c.selectedOptionValueIds,
+        })),
       });
-      const data = (await res.json()) as { order?: Order; error?: string };
-      if (!res.ok || !data.order) {
-        setOrderError(data.error || "Unable to place order.");
-        setSubmitting(false);
-        return;
-      }
-      setConfirmedOrder(data.order);
+      setConfirmedOrder(order);
       setCart([]);
-    } catch {
-      setOrderError("Network error while placing order.");
+    } catch (err) {
+      setOrderError(
+        err instanceof Error ? err.message : "Unable to place order."
+      );
     } finally {
       setSubmitting(false);
     }

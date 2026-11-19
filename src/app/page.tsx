@@ -10,9 +10,7 @@ import {
   Store,
 } from "lucide-react";
 import LandingPreview from "@/components/LandingPreview";
-import { getStore } from "@/lib/store";
-
-export const dynamic = "force-dynamic";
+import { getStarterSeedDataset } from "@/lib/demo-fallback";
 
 const modules = [
   {
@@ -38,12 +36,12 @@ const modules = [
   {
     icon: ChartNoAxesCombined,
     title: "Server-validated orders",
-    text: "Order totals are computed server-side from catalog pricing with instant kitchen status tracking.",
+    text: "Order totals are computed from catalog pricing with instant kitchen status tracking in Firestore.",
   },
   {
     icon: ShieldCheck,
     title: "Multi-tenant isolation",
-    text: "Platform super-admin provisioning, role-based staff access, and custom domain verification.",
+    text: "Platform super-admin provisioning, Google Auth role-based staff access, and custom domain verification.",
   },
 ];
 
@@ -51,12 +49,12 @@ const steps = [
   {
     num: "01",
     title: "Provision a restaurant tenant",
-    text: "Create the restaurant from Super Admin. Starter categories, main branch, QR code, and owner credentials generate automatically.",
+    text: "Create the restaurant from Super Admin. Starter categories, main branch, QR code, and owner invite generate automatically.",
   },
   {
     num: "02",
     title: "Send the client workspace link",
-    text: "Share the dedicated dashboard URL and credentials with the restaurant owner for self-service onboarding.",
+    text: "Share the dedicated dashboard URL with the restaurant owner for one-click Google sign-in and self-service onboarding.",
   },
   {
     num: "03",
@@ -71,13 +69,13 @@ const steps = [
 ];
 
 export default function Home() {
-  const store = getStore();
-  const previewTenants = store.restaurants.slice(0, 3).map((restaurant) => {
-    const items = store.products
+  const seed = getStarterSeedDataset();
+  const previewTenants = seed.restaurants.slice(0, 3).map((restaurant) => {
+    const items = seed.products
       .filter((p) => p.restaurantId === restaurant.id)
       .slice(0, 2)
       .map((p) => {
-        const cat = store.categories.find((c) => c.id === p.categoryId);
+        const cat = seed.categories.find((c) => c.id === p.categoryId);
         return {
           name: p.name,
           category: cat?.name || "Menu",
@@ -184,13 +182,13 @@ export default function Home() {
           <div className="mt-12 grid grid-cols-3 gap-6 border-t border-[#252d2b] pt-8">
             <div>
               <p className="tabular-nums text-2xl font-semibold">
-                {store.restaurants.length}
+                {seed.restaurants.length}
               </p>
               <p className="muted mt-1 text-xs">Active tenant spaces</p>
             </div>
             <div>
               <p className="tabular-nums text-2xl font-semibold">
-                {store.products.length}
+                {seed.products.length}
               </p>
               <p className="muted mt-1 text-xs">Catalog dishes live</p>
             </div>
