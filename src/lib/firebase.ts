@@ -5,20 +5,25 @@ import {
   getDocFromServer,
   getFirestore,
   initializeFirestore,
+  memoryLocalCache,
   type Firestore,
+  type FirestoreSettings,
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 function initFirestore(): Firestore {
-  const settings =
+  const settings: FirestoreSettings & { useFetchStreams?: boolean } =
     typeof window !== "undefined"
       ? {
           experimentalForceLongPolling: true,
+          useFetchStreams: false,
+          localCache: memoryLocalCache(),
           ignoreUndefinedProperties: true,
         }
       : {
+          localCache: memoryLocalCache(),
           ignoreUndefinedProperties: true,
         };
 
