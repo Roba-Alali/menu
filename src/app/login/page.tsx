@@ -1,11 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, LogOut, ShieldCheck, Store } from "lucide-react";
+import AuthFormPanel from "@/components/AuthFormPanel";
 import { useAuth } from "@/components/AuthProvider";
 import { BOOT_ADMIN_EMAIL } from "@/lib/demo-fallback";
+import type { PublicUser } from "@/lib/types";
 
 function LoginForm() {
   const router = useRouter();
@@ -15,37 +17,17 @@ function LoginForm() {
   const {
     publicUser,
     isAuthReady,
+    isEmailVerified,
     isPlatformAdmin,
-    isSigningIn,
-    authError,
-    clearAuthError,
-    signInWithGoogle,
     signOutUser,
     resolveDefaultRoute,
   } = useAuth();
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [continuing, setContinuing] = useState(false);
 
-  async function handleGoogleLogin() {
-    setError("");
-    clearAuthError();
-    setLoading(true);
-    try {
-      const user = await signInWithGoogle();
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-      const target = nextPath || (await resolveDefaultRoute(user));
-      router.push(target);
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to sign in with Google.";
-      setError(msg);
-      setLoading(false);
-    }
+  async function handleSuccessRedirect(user: PublicUser) {
+    const target = nextPath || (await resolveDefaultRoute(user));
+    router.push(target);
   }
 
   async function handleContinueSignedIn() {
@@ -54,10 +36,6 @@ function LoginForm() {
     const target = nextPath || (await resolveDefaultRoute(publicUser));
     router.push(target);
   }
-
-  useEffect(() => {
-    setError("");
-  }, [publicUser?.id]);
 
   return (
     <main className="min-h-screen bg-[#090b0b] px-5 py-12">
@@ -83,15 +61,15 @@ function LoginForm() {
               Sign in to QLUB
             </h1>
             <p className="muted mt-2 text-sm leading-6">
-              Authenticate with your verified Google account to enter the
-              Super Admin console or your restaurant&apos;s white-label dashboard.
+              Sign in with Email &amp; Password or Google to enter the Super
+              Admin console or your restaurant&apos;s white-label dashboard.
             </p>
 
-            {isAuthReady && publicUser ? (
+            {isAuthReady && publicUser && isEmailVerified ? (
               <div className="mt-8 space-y-4 rounded-2xl border border-[#252d2b] bg-[#121716] p-5">
                 <div>
                   <p className="text-xs font-medium text-[#86efac]">
-                    Signed in with Google
+                    Verified session active
                   </p>
                   <p className="mt-1 text-base font-semibold text-[#f5f5f1]">
                     {publicUser.fullName}
@@ -131,31 +109,11 @@ function LoginForm() {
                 )}
               </div>
             ) : (
-              <div className="mt-8 space-y-4">
-                {(error || authError) && (
-                  <div
-                    role="alert"
-                    className="rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-xs text-red-200"
-                  >
-                    {error || authError}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  disabled={loading || isSigningIn || !isAuthReady}
-                  onClick={() => void handleGoogleLogin()}
-                  className="flex h-12 w-full items-center justify-center gap-3 rounded-full bg-[#c8a66a] px-6 text-sm font-semibold text-[#10110e] transition-opacity hover:opacity-90 disabled:opacity-60"
-                >
-                  <span>
-                    {!isAuthReady
-                      ? "Checking session..."
-                      : loading || isSigningIn
-                        ? "Connecting Google..."
-                        : "Continue with Google"}
-                  </span>
-                  <ArrowRight size={15} />
-                </button>
+              <div className="mt-7">
+                <AuthFormPanel
+                  submitLabel="Sign in with Email & Password"
+                  onAuthenticated={handleSuccessRedirect}
+                />
               </div>
             )}
           </div>
@@ -174,10 +132,10 @@ function LoginForm() {
               <span>ROLE-BASED ACCESS CONTROL</span>
             </div>
             <h2 className="mt-3 text-xl font-semibold">
-              Multi-tenant Google onboarding
+              Super Admin &amp; Restaurant Onboarding
             </h2>
             <p className="muted mt-2 text-sm leading-6">
-              Roles resolve automatically from your signed-in Google email.
+              Access resolves automatically from your verified Firebase account.
             </p>
 
             <div className="mt-6 space-y-3">
@@ -186,24 +144,30 @@ function LoginForm() {
                   Platform Super Admin
                 </p>
                 <p className="muted mt-1 text-xs leading-5">
-                  Bootstrapped owner{" "}
+                  Sign in with{" "}
                   <span className="font-mono-num text-[#c8a66a]">
                     {BOOT_ADMIN_EMAIL}
                   </span>{" "}
-                  and authorized platform operators manage tenants, seed starter
-                  brands, and configure domains.
+                  (Email &amp; Password or Google) to create restaurants, assign
+                  owners, and manage platform billing &amp; domains.
                 </p>
+                <Link
+                  href="/admin"
+                  className="mt-2.5 inline-block text-xs font-medium text-[#c8a66a] hover:underline"
+                >
+                  Open Super Admin sign-in →
+                </Link>
               </div>
 
               <div className="rounded-xl border border-[#252d2b] bg-[#151a19] p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[#f5f5f1]">
                   <Store size={15} className="text-[#c8a66a]" />
-                  <span>Restaurant Owners & Staff</span>
+                  <span>Restaurant Owners &amp; Staff</span>
                 </div>
                 <p className="muted mt-1 text-xs leading-5">
                   Any restaurant owner or team email invited in Super Admin or
                   Team Settings claims their isolated dashboard automatically
-                  upon signing in with Google.
+                  after verifying their email.
                 </p>
               </div>
             </div>
@@ -217,7 +181,7 @@ function LoginForm() {
               href="/forgot-password"
               className="text-[#9aa6a1] hover:text-[#f5f5f1]"
             >
-              Account recovery
+              Reset / set password
             </Link>
           </div>
         </aside>

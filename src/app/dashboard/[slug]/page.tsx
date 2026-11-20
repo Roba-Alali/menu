@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ShieldCheck, Store } from "lucide-react";
+import AuthFormPanel from "@/components/AuthFormPanel";
 import { useAuth } from "@/components/AuthProvider";
 import RestaurantDashboard from "@/components/dashboard/RestaurantDashboard";
 import { DEFAULT_PLATFORM_SETTINGS } from "@/lib/demo-fallback";
@@ -15,12 +16,11 @@ export default function DashboardPage() {
   const slug = params?.slug || "";
 
   const {
+    firebaseUser,
     publicUser,
     isAuthReady,
+    isEmailVerified,
     isPlatformAdmin,
-    isSigningIn,
-    authError,
-    signInWithGoogle,
     signOutUser,
   } = useAuth();
 
@@ -33,7 +33,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
 
   const loadDashboard = useCallback(async () => {
-    if (!publicUser || !slug) return;
+    if (!publicUser || !isEmailVerified || !slug) return;
     setLoading(true);
     try {
       const res = await ensureMembershipAndLoadDashboard(
@@ -56,13 +56,13 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [slug, publicUser, isPlatformAdmin]);
+  }, [slug, publicUser, isEmailVerified, isPlatformAdmin]);
 
   useEffect(() => {
-    if (isAuthReady && publicUser && slug) {
+    if (isAuthReady && publicUser && isEmailVerified && slug) {
       void loadDashboard();
     }
-  }, [isAuthReady, publicUser, slug, loadDashboard]);
+  }, [isAuthReady, publicUser, isEmailVerified, slug, loadDashboard]);
 
   if (!isAuthReady) {
     return (
@@ -72,47 +72,33 @@ export default function DashboardPage() {
     );
   }
 
-  if (!publicUser) {
+  if (!publicUser || !isEmailVerified) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#090b0b] px-5 py-12">
         <div className="panel w-full max-w-md p-7 md:p-8">
-          <div className="flex items-center gap-2 text-xs font-medium tracking-[0.18em] text-[#c8a66a]">
-            <Store size={15} />
-            <span>RESTAURANT WORKSPACE</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-medium tracking-[0.18em] text-[#c8a66a]">
+              <Store size={15} />
+              <span>RESTAURANT WORKSPACE</span>
+            </div>
+            <Link
+              href={`/r/${slug}`}
+              className="text-xs text-[#9aa6a1] hover:text-[#f5f5f1]"
+            >
+              Public menu
+            </Link>
           </div>
           <h1 className="font-display mt-3 text-3xl font-semibold">
             Sign in to manage /{slug}
           </h1>
           <p className="muted mt-2 text-sm leading-6">
-            Continue with your invited Google account to access this
-            restaurant&apos;s brand editor, menu catalog, QR codes, and live
-            orders.
+            {firebaseUser && !isEmailVerified
+              ? `Verify ${firebaseUser.email} to unlock this restaurant's brand editor, products, QR codes, and orders.`
+              : "Sign in with your invited Email & Password or Google account to access this restaurant workspace."}
           </p>
 
-          {authError && (
-            <div
-              role="alert"
-              className="mt-4 rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-xs text-red-200"
-            >
-              {authError}
-            </div>
-          )}
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              type="button"
-              disabled={isSigningIn}
-              onClick={() => void signInWithGoogle()}
-              className="h-11 flex-1 rounded-full bg-[#c8a66a] px-6 text-sm font-semibold text-[#10110e] transition-opacity hover:opacity-90 disabled:opacity-60"
-            >
-              {isSigningIn ? "Connecting Google..." : "Continue with Google"}
-            </button>
-            <Link
-              href={`/r/${slug}`}
-              className="flex h-11 items-center rounded-full border border-[#39413e] px-5 text-xs font-medium"
-            >
-              Public menu
-            </Link>
+          <div className="mt-6">
+            <AuthFormPanel submitLabel={`Sign in to /${slug}`} />
           </div>
         </div>
       </main>
@@ -141,7 +127,7 @@ export default function DashboardPage() {
               onClick={() => void signOutUser()}
               className="h-11 flex-1 rounded-full bg-[#c8a66a] px-6 text-sm font-semibold text-[#10110e]"
             >
-              Switch Google account
+              Switch account
             </button>
             <Link
               href={`/r/${slug}`}
