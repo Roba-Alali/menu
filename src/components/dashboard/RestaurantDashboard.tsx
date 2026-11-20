@@ -31,7 +31,11 @@ import {
 import BrandLogo from "@/components/BrandLogo";
 import DishImage from "@/components/DishImage";
 import { useAuth } from "@/components/AuthProvider";
-import { isValidLogoUrl, processLogoFile } from "@/lib/logo-upload";
+import {
+  isValidLogoUrl,
+  processDishImageFile,
+  processLogoFile,
+} from "@/lib/logo-upload";
 import { db } from "@/lib/firebase";
 import {
   OperationType,
@@ -144,6 +148,9 @@ export default function RestaurantDashboard({
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [productSaving, setProductSaving] = useState(false);
+  const [dishImageUploading, setDishImageUploading] = useState(false);
+  const [dishImageError, setDishImageError] = useState("");
+  const dishImageInputRef = useRef<HTMLInputElement | null>(null);
   const [productFilterCat, setProductFilterCat] = useState<string>("all");
   const [prodForm, setProdForm] = useState<{
     name: string;
@@ -186,6 +193,7 @@ export default function RestaurantDashboard({
 
   // Domain & member forms
   const [domainInput, setDomainInput] = useState("");
+  const [domainError, setDomainError] = useState("");
   const [memberForm, setMemberForm] = useState({
     fullName: "",
     email: "",
@@ -457,8 +465,34 @@ export default function RestaurantDashboard({
     }));
   }
 
+  async function handleDishImageSelected(file: File | undefined) {
+    if (!file) return;
+    setDishImageError("");
+    setDishImageUploading(true);
+    try {
+      const processed = await processDishImageFile(file);
+      setProdForm((prev) => ({ ...prev, imageUrl: processed.dataUrl }));
+    } catch (err) {
+      setDishImageError(
+        err instanceof Error ? err.message : "Could not process dish photo."
+      );
+    } finally {
+      setDishImageUploading(false);
+      if (dishImageInputRef.current) {
+        dishImageInputRef.current.value = "";
+      }
+    }
+  }
+
   async function handleSaveProduct(e: React.FormEvent) {
     e.preventDefault();
+    if (!isValidLogoUrl(prodForm.imageUrl)) {
+      setDishImageError(
+        "Dish image must start with https://, http://, /, or be an uploaded photo."
+      );
+      return;
+    }
+    setDishImageError("");
     setProductSaving(true);
     try {
       await saveProductInFirestore(restaurant.slug, restaurant, {
@@ -546,10 +580,17 @@ export default function RestaurantDashboard({
   async function handleAddDomain(e: React.FormEvent) {
     e.preventDefault();
     if (!domainInput.trim()) return;
-    await addDomainInFirestore(restaurant.slug, restaurant, domainInput);
-    setDomainInput("");
-    await refreshBundle();
-    showToast("Custom domain added.");
+    setDomainError("");
+    try {
+      await addDomainInFirestore(restaurant.slug, restaurant, domainInput);
+      setDomainInput("");
+      await refreshBundle();
+      showToast("Custom domain added.");
+    } catch (err) {
+      setDomainError(
+        err instanceof Error ? err.message : "Could not add custom domain."
+      );
+    }
   }
 
   async function handleVerifyDomain(id: string) {
@@ -913,20 +954,37 @@ export default function RestaurantDashboard({
                       Guests can scan a QR code or open this URL directly on any
                       device.
                     </p>
-                    <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-[#252d2b] bg-[#0d1010] px-3.5 py-3">
-                      <span className="font-mono-num truncate text-xs text-[#f5f5f1]">
-                        {origin}/r/{restaurant.slug}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          copyValue("pub", `${origin}/r/${restaurant.slug}`)
-                        }
-                        className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 text-xs font-medium text-[#c8a66a]"
-                      >
-                        {copied === "pub" ? <Check size={13} /> : <Copy size={13} />}
-                        Copy
-                      </button>
+                    <div className="mt-4 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2 rounded-xl border border-[#252d2b] bg-[#0d1010] px-3.5 py-3">
+                        <span className="font-mono-num truncate text-xs text-[#f5f5f1]">
+                          {origin}/r/{restaurant.slug}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyValue("pub", `${origin}/r/${restaurant.slug}`)
+                          }
+                          className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 text-xs font-medium text-[#c8a66a]"
+                        >
+                          {copied === "pub" ? <Check size={13} /> : <Copy size={13} />}
+                          Copy
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 rounded-xl border border-[#252d2b] bg-[#0d1010] px-3.5 py-2.5">
+                        <span className="font-mono-num truncate text-xs text-[#aab4af]">
+                          https://{restaurant.slug}.qlub.app
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyValue("sub", `https://${restaurant.slug}.qlub.app`)
+                          }
+                          className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 text-xs font-medium text-[#c8a66a]"
+                        >
+                          {copied === "sub" ? <Check size={13} /> : <Copy size={13} />}
+                          Subdomain
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -1930,13 +1988,32 @@ export default function RestaurantDashboard({
                   and verify routing below.
                 </p>
 
+                <div className="mt-4 rounded-xl border border-[#252d2b] bg-[#0d1010] p-3.5 text-xs">
+                  <span className="muted">Built-in white-label subdomain</span>
+                  <div className="mt-1 flex items-center justify-between gap-3">
+                    <span className="font-mono-num text-[#f5f5f1]">
+                      {restaurant.slug}.qlub.app
+                    </span>
+                    <Link
+                      href={`/r/${restaurant.slug}`}
+                      target="_blank"
+                      className="inline-flex items-center gap-1 text-[#c8a66a] hover:underline"
+                    >
+                      Open storefront <ExternalLink size={12} />
+                    </Link>
+                  </div>
+                </div>
+
                 <form onSubmit={handleAddDomain} className="mt-5 flex gap-2">
                   <input
                     type="text"
                     required
                     placeholder="menu.yourbrand.com"
                     value={domainInput}
-                    onChange={(e) => setDomainInput(e.target.value)}
+                    onChange={(e) => {
+                      setDomainError("");
+                      setDomainInput(e.target.value);
+                    }}
                     className="font-mono-num h-10 flex-1 rounded-xl border border-[#252d2b] bg-[#0d1010] px-3 text-xs"
                   />
                   <button
@@ -1947,17 +2024,30 @@ export default function RestaurantDashboard({
                   </button>
                 </form>
 
+                {domainError && (
+                  <p className="mt-2 text-xs text-red-300" role="alert">
+                    {domainError}
+                  </p>
+                )}
+
                 <div className="mt-5 divide-y divide-[#252d2b]">
                   {domains.map((d) => (
                     <div
                       key={d.id}
-                      className="flex items-center justify-between gap-3 py-3 text-xs"
+                      className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"
                     >
                       <div className="flex items-center gap-2">
                         <Globe size={14} className="gold" />
                         <span className="font-mono-num">{d.hostname}</span>
                       </div>
                       <div className="flex items-center gap-3">
+                        <Link
+                          href={`/site/${encodeURIComponent(d.hostname)}`}
+                          target="_blank"
+                          className="inline-flex items-center gap-1 text-[#aab4af] hover:text-[#f5f5f1]"
+                        >
+                          Preview <ExternalLink size={11} />
+                        </Link>
                         {d.isVerified ? (
                           <span className="text-[#86efac]">Verified</span>
                         ) : (
@@ -2225,18 +2315,57 @@ export default function RestaurantDashboard({
                   </div>
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-xs text-[#aab4af]">
-                    Dish image preset or custom URL
-                  </label>
-                  <div className="mb-2 flex flex-wrap gap-2">
+                <div className="rounded-xl border border-[#252d2b] bg-[#0d1010] p-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-[#252d2b]">
+                        <DishImage
+                          src={prodForm.imageUrl}
+                          alt={prodForm.name || "Dish photo"}
+                          accentColor={restaurant.primaryColor}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-[#f5f5f1]">
+                          Dish photo
+                        </label>
+                        <p className="muted text-[11px]">
+                          Upload from device, pick a preset, or paste an image URL.
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <input
+                        ref={dishImageInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        className="hidden"
+                        onChange={(e) =>
+                          void handleDishImageSelected(e.target.files?.[0])
+                        }
+                      />
+                      <button
+                        type="button"
+                        disabled={dishImageUploading}
+                        onClick={() => dishImageInputRef.current?.click()}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-[#c8a66a] bg-[#1a1812] px-4 py-1.5 text-xs font-semibold text-[#e5c991] transition-colors hover:bg-[#c8a66a] hover:text-[#10110e] disabled:opacity-50"
+                      >
+                        <Upload size={12} />
+                        {dishImageUploading ? "Processing..." : "Upload photo"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
                     {GALLERY_PRESETS.map((g) => (
                       <button
                         key={g.url}
                         type="button"
-                        onClick={() =>
-                          setProdForm({ ...prodForm, imageUrl: g.url })
-                        }
+                        onClick={() => {
+                          setDishImageError("");
+                          setProdForm({ ...prodForm, imageUrl: g.url });
+                        }}
                         className={`rounded-lg border px-2.5 py-1 text-[11px] ${
                           prodForm.imageUrl === g.url
                             ? "border-[#c8a66a] text-[#c8a66a]"
@@ -2249,12 +2378,27 @@ export default function RestaurantDashboard({
                   </div>
                   <input
                     type="text"
-                    value={prodForm.imageUrl}
-                    onChange={(e) =>
-                      setProdForm({ ...prodForm, imageUrl: e.target.value })
+                    value={
+                      prodForm.imageUrl.startsWith("data:")
+                        ? ""
+                        : prodForm.imageUrl
                     }
-                    className="font-mono-num h-9 w-full rounded-xl border border-[#252d2b] bg-[#0d1010] px-3 text-xs"
+                    onChange={(e) => {
+                      setDishImageError("");
+                      setProdForm({ ...prodForm, imageUrl: e.target.value });
+                    }}
+                    placeholder={
+                      prodForm.imageUrl.startsWith("data:")
+                        ? "Uploaded dish photo active (upload a new file or pick a preset above to replace)"
+                        : "https://... or /images/..."
+                    }
+                    className="font-mono-num mt-2 h-9 w-full rounded-xl border border-[#252d2b] bg-[#111515] px-3 text-xs"
                   />
+                  {dishImageError && (
+                    <p className="mt-1.5 text-xs text-red-300" role="alert">
+                      {dishImageError}
+                    </p>
+                  )}
                 </div>
 
                 <div>

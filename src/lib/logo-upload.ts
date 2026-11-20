@@ -59,7 +59,6 @@ function renderScaledDataUrl(
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, 0, 0, width, height);
 
-  // Prefer WebP for crisp alpha transparency and compact payload; fall back cleanly to PNG
   const webp = canvas.toDataURL("image/webp", quality);
   if (webp.startsWith("data:image/webp;base64,")) {
     return { dataUrl: webp, width, height };
@@ -68,7 +67,10 @@ function renderScaledDataUrl(
   return { dataUrl: png, width, height };
 }
 
-export async function processLogoFile(file: File): Promise<ProcessedLogoResult> {
+async function processOptimizedImage(
+  file: File,
+  attempts: Array<{ maxDim: number; quality: number }>
+): Promise<ProcessedLogoResult> {
   const lowerName = file.name.toLowerCase();
   const isImageMime = file.type.startsWith("image/");
   const isAllowedExt = /\.(png|jpe?g|webp|gif|svg)$/i.test(lowerName);
@@ -76,17 +78,10 @@ export async function processLogoFile(file: File): Promise<ProcessedLogoResult> 
     throw new Error("Please select an image file (PNG, JPG, WebP, GIF, or SVG).");
   }
   if (file.size > MAX_SOURCE_FILE_BYTES) {
-    throw new Error("Logo file must be 8 MB or smaller.");
+    throw new Error("Image file must be 8 MB or smaller.");
   }
 
   const img = await loadImageFromFile(file);
-
-  const attempts: Array<{ maxDim: number; quality: number }> = [
-    { maxDim: 256, quality: 0.9 },
-    { maxDim: 192, quality: 0.85 },
-    { maxDim: 160, quality: 0.8 },
-    { maxDim: 128, quality: 0.72 },
-  ];
 
   for (const { maxDim, quality } of attempts) {
     const rendered = renderScaledDataUrl(img, maxDim, quality);
@@ -99,6 +94,26 @@ export async function processLogoFile(file: File): Promise<ProcessedLogoResult> 
   }
 
   throw new Error(
-    "This image stays too large after optimization. Try a simpler logo file."
+    "This image stays too large after optimization. Try a smaller or simpler image."
   );
+}
+
+export async function processLogoFile(file: File): Promise<ProcessedLogoResult> {
+  return processOptimizedImage(file, [
+    { maxDim: 256, quality: 0.9 },
+    { maxDim: 192, quality: 0.85 },
+    { maxDim: 160, quality: 0.8 },
+    { maxDim: 128, quality: 0.72 },
+  ]);
+}
+
+export async function processDishImageFile(
+  file: File
+): Promise<ProcessedLogoResult> {
+  return processOptimizedImage(file, [
+    { maxDim: 720, quality: 0.84 },
+    { maxDim: 560, quality: 0.8 },
+    { maxDim: 440, quality: 0.76 },
+    { maxDim: 320, quality: 0.7 },
+  ]);
 }

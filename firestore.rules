@@ -17,6 +17,10 @@ service cloud.firestore {
       return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    function isValidDomainHost(host) {
+      return host is string && host.size() >= 3 && host.size() <= 200 && host.matches('^[a-z0-9][a-z0-9.\\-]*[a-z0-9]$');
+    }
+
     function incoming() {
       return request.resource.data;
     }
@@ -161,7 +165,7 @@ service cloud.firestore {
         data.nameAr is string && data.nameAr.size() <= 140 &&
         data.description is string && data.description.size() <= 500 &&
         data.descriptionAr is string && data.descriptionAr.size() <= 500 &&
-        data.imageUrl is string && data.imageUrl.size() <= 500 &&
+        data.imageUrl is string && data.imageUrl.size() <= 200000 && (data.imageUrl == '' || data.imageUrl.matches('^(https?://|/|data:image/(png|jpeg|jpg|webp|gif);base64,).*')) &&
         data.price is number && data.price >= 0 &&
         (data.compareAtPrice == null || (data.compareAtPrice is number && data.compareAtPrice >= 0)) &&
         data.isAvailable is bool &&
@@ -222,6 +226,17 @@ service cloud.firestore {
         data.updatedAt is timestamp;
     }
 
+    function isValidDomainRoute(data) {
+      return data.keys().hasAll(['hostname', 'restaurantId', 'slug', 'isVerified', 'ownerUid', 'updatedAt']) &&
+        data.keys().hasOnly(['hostname', 'restaurantId', 'slug', 'isVerified', 'ownerUid', 'updatedAt']) &&
+        isValidDomainHost(data.hostname) &&
+        isValidId(data.restaurantId) &&
+        isValidId(data.slug) && data.slug.size() <= 100 &&
+        data.isVerified is bool &&
+        data.ownerUid is string && data.ownerUid.size() <= 128 &&
+        data.updatedAt is timestamp;
+    }
+
     // --- Collection Rules ---
     match /users/{userId} {
       allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
@@ -255,6 +270,25 @@ service cloud.firestore {
         incoming().updatedAt == request.time &&
         incoming().diff(existing()).affectedKeys().hasOnly(['platformName', 'supportEmail', 'defaultCnameTarget', 'allowSelfServiceOrdering', 'defaultCurrency', 'updatedAt']);
       allow delete: if false;
+    }
+
+    match /domainRoutes/{hostname} {
+      allow get: if isValidDomainHost(hostname);
+      allow list: if isAdmin();
+      allow create: if isValidDomainHost(hostname) && isValidDomainRoute(incoming()) &&
+        incoming().hostname == hostname &&
+        exists(/databases/$(database)/documents/restaurants/$(incoming().slug)) &&
+        isRestaurantWriter(incoming().slug) &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidDomainHost(hostname) && isValidDomainRoute(incoming()) &&
+        incoming().hostname == existing().hostname &&
+        incoming().slug == existing().slug &&
+        isRestaurantWriter(existing().slug) &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['isVerified', 'updatedAt']);
+      allow delete: if isValidDomainHost(hostname) && (
+        isAdmin() || isRestaurantWriter(existing().slug)
+      );
     }
 
     match /restaurants/{slug} {

@@ -131,7 +131,7 @@
         "nameAr": { "type": "string", "maxLength": 140 },
         "description": { "type": "string", "maxLength": 500 },
         "descriptionAr": { "type": "string", "maxLength": 500 },
-        "imageUrl": { "type": "string", "maxLength": 500 },
+        "imageUrl": { "type": "string", "maxLength": 200000 },
         "price": { "type": "number" },
         "compareAtPrice": { "type": "number" },
         "isAvailable": { "type": "boolean" },
@@ -205,6 +205,20 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "restaurantId", "orderNumber", "customerName", "orderType", "status", "currency", "subtotal", "total", "items", "ownerEmail", "createdAt", "updatedAt"]
+    },
+    "DomainRoute": {
+      "title": "DomainRoute",
+      "description": "Public hostname-to-slug lookup for custom domain white-label storefronts.",
+      "type": "object",
+      "properties": {
+        "hostname": { "type": "string", "minLength": 3, "maxLength": 200 },
+        "restaurantId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "slug": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[a-z0-9\\-]+$" },
+        "isVerified": { "type": "boolean" },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["hostname", "restaurantId", "slug", "isVerified", "updatedAt"]
     }
   },
   "firestore": {
@@ -219,6 +233,10 @@
     "/platformSettings/{settingId}": {
       "schema": { "$ref": "#/entities/PlatformSettings" },
       "description": "Global platform configuration."
+    },
+    "/domainRoutes/{hostname}": {
+      "schema": { "$ref": "#/entities/DomainRoute" },
+      "description": "Verified custom domain hostname routing index."
     },
     "/restaurants/{slug}": {
       "schema": { "$ref": "#/entities/Restaurant" },

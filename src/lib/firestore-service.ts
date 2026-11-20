@@ -62,6 +62,18 @@ function clamp(val: string | undefined | null, max: number, fallback = ""): stri
   return (val ?? fallback).trim().slice(0, max);
 }
 
+export function normalizeDomainHost(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .split("/")[0]
+    .split(":")[0]
+    .replace(/[^a-z0-9.\-]/g, "")
+    .replace(/^\.+|\.+$/g, "")
+    .slice(0, 200);
+}
+
 function mapRestaurant(id: string, data: Record<string, unknown>): Restaurant {
   return {
     id: String(data.id || id),
@@ -411,6 +423,45 @@ export async function fetchPublicRestaurantMenu(
   }
 }
 
+export async function fetchPublicRestaurantByDomain(
+  hostname: string,
+  hasSignedInUser: boolean
+): Promise<{
+  restaurant: Restaurant;
+  branches: Branch[];
+  categories: MenuCategory[];
+  products: Product[];
+  isFallbackPreview: boolean;
+  hostname: string;
+  isVerified: boolean;
+} | null> {
+  const normalized = normalizeDomainHost(hostname);
+  if (!normalized || normalized.length < 3) return null;
+
+  try {
+    const routeSnap = await getDoc(doc(db, "domainRoutes", normalized));
+    if (!routeSnap.exists()) {
+      return null;
+    }
+    const routeData = routeSnap.data() as Record<string, unknown>;
+    const slug = String(routeData.slug || "");
+    const isVerified = Boolean(routeData.isVerified);
+    if (!slug) return null;
+    if (!isVerified && !hasSignedInUser) return null;
+
+    const menu = await fetchPublicRestaurantMenu(slug, hasSignedInUser);
+    if (!menu) return null;
+
+    return {
+      ...menu,
+      hostname: normalized,
+      isVerified,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function placePublicOrderInFirestore(input: {
   restaurant: Restaurant;
   products: Product[];
@@ -635,14 +686,25 @@ export async function seedInitialDemoDataIfEmpty(
         });
       }
       for (const dom of seed.domains.filter((d) => d.restaurantId === rest.id)) {
+        const cleanHost = normalizeDomainHost(dom.hostname);
         batch.set(doc(db, "restaurants", rest.slug, "domains", dom.id), {
           id: dom.id,
           restaurantId: rest.id,
-          hostname: clamp(dom.hostname, 200),
+          hostname: cleanHost,
           isVerified: dom.isVerified,
           ownerUid: adminUid,
           createdAt: serverTimestamp(),
         });
+        if (cleanHost.length >= 3) {
+          batch.set(doc(db, "domainRoutes", cleanHost), {
+            hostname: cleanHost,
+            restaurantId: rest.id,
+            slug: rest.slug,
+            isVerified: dom.isVerified,
+            ownerUid: adminUid,
+            updatedAt: serverTimestamp(),
+          });
+        }
       }
       for (const qr of seed.qrCodes.filter((q) => q.restaurantId === rest.id)) {
         batch.set(doc(db, "restaurants", rest.slug, "qrCodes", qr.id), {
@@ -1023,15 +1085,26 @@ export async function provisionRestaurantInFirestore(
     });
 
     if (input.customDomain?.trim()) {
-      const domId = makeId("dom");
-      batch.set(doc(db, "restaurants", finalSlug, "domains", domId), {
-        id: domId,
-        restaurantId: finalSlug,
-        hostname: clamp(input.customDomain.toLowerCase(), 200),
-        isVerified: false,
-        ownerUid: adminUid,
-        createdAt: serverTimestamp(),
-      });
+      const cleanHost = normalizeDomainHost(input.customDomain);
+      if (cleanHost.length >= 3) {
+        const domId = makeId("dom");
+        batch.set(doc(db, "restaurants", finalSlug, "domains", domId), {
+          id: domId,
+          restaurantId: finalSlug,
+          hostname: cleanHost,
+          isVerified: false,
+          ownerUid: adminUid,
+          createdAt: serverTimestamp(),
+        });
+        batch.set(doc(db, "domainRoutes", cleanHost), {
+          hostname: cleanHost,
+          restaurantId: finalSlug,
+          slug: finalSlug,
+          isVerified: false,
+          ownerUid: adminUid,
+          updatedAt: serverTimestamp(),
+        });
+      }
     }
 
     const normalizedEmail = clamp(input.ownerEmail.toLowerCase(), 200);
@@ -1113,6 +1186,19 @@ export async function updateRestaurantAdmin(
 
 export async function deleteRestaurantCascade(slug: string): Promise<void> {
   try {
+    const domainsSnap = await getDocs(
+      collection(db, "restaurants", slug, "domains")
+    );
+    for (const domDoc of domainsSnap.docs) {
+      const host = normalizeDomainHost(String(domDoc.data().hostname || ""));
+      if (host.length >= 3) {
+        try {
+          await deleteDoc(doc(db, "domainRoutes", host));
+        } catch {
+          // Ignore missing route doc
+        }
+      }
+    }
     const subcollections = [
       "branches",
       "categories",
@@ -1484,7 +1570,7 @@ export async function saveProductInFirestore(
       nameAr: clamp(input.nameAr, 140),
       description: clamp(input.description, 500),
       descriptionAr: clamp(input.descriptionAr, 500),
-      imageUrl: clamp(input.imageUrl, 500, "/images/dish_truffle_pasta.jpg"),
+      imageUrl: clamp(input.imageUrl, 200000, "/images/dish_truffle_pasta.jpg"),
       price: Math.max(0, Number(input.price) || 0),
       compareAtPrice:
         input.compareAtPrice !== null && input.compareAtPrice >= 0
@@ -1667,14 +1753,26 @@ export async function addDomainInFirestore(
   hostname: string
 ): Promise<void> {
   const id = makeId("dom");
+  const cleanHost = normalizeDomainHost(hostname);
+  if (cleanHost.length < 3) {
+    throw new Error("Enter a valid domain hostname (e.g. menu.yourbrand.com).");
+  }
   try {
     await setDoc(doc(db, "restaurants", slug, "domains", id), {
       id,
       restaurantId: restaurant.id,
-      hostname: clamp(hostname.toLowerCase(), 200),
+      hostname: cleanHost,
       isVerified: false,
       ownerUid: restaurant.ownerUid || "",
       createdAt: serverTimestamp(),
+    });
+    await setDoc(doc(db, "domainRoutes", cleanHost), {
+      hostname: cleanHost,
+      restaurantId: restaurant.id,
+      slug,
+      isVerified: false,
+      ownerUid: restaurant.ownerUid || "",
+      updatedAt: serverTimestamp(),
     });
   } catch (error) {
     handleFirestoreError(
@@ -1690,9 +1788,35 @@ export async function verifyDomainInFirestore(
   id: string
 ): Promise<void> {
   try {
-    await updateDoc(doc(db, "restaurants", slug, "domains", id), {
+    const domRef = doc(db, "restaurants", slug, "domains", id);
+    const domSnap = await getDoc(domRef);
+    await updateDoc(domRef, {
       isVerified: true,
     });
+    if (domSnap.exists()) {
+      const cleanHost = normalizeDomainHost(
+        String(domSnap.data().hostname || "")
+      );
+      if (cleanHost.length >= 3) {
+        const routeRef = doc(db, "domainRoutes", cleanHost);
+        const routeSnap = await getDoc(routeRef);
+        if (routeSnap.exists()) {
+          await updateDoc(routeRef, {
+            isVerified: true,
+            updatedAt: serverTimestamp(),
+          });
+        } else {
+          await setDoc(routeRef, {
+            hostname: cleanHost,
+            restaurantId: String(domSnap.data().restaurantId || slug),
+            slug,
+            isVerified: true,
+            ownerUid: String(domSnap.data().ownerUid || ""),
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+    }
   } catch (error) {
     handleFirestoreError(
       error,
@@ -1707,7 +1831,21 @@ export async function deleteDomainInFirestore(
   id: string
 ): Promise<void> {
   try {
-    await deleteDoc(doc(db, "restaurants", slug, "domains", id));
+    const domRef = doc(db, "restaurants", slug, "domains", id);
+    const domSnap = await getDoc(domRef);
+    if (domSnap.exists()) {
+      const cleanHost = normalizeDomainHost(
+        String(domSnap.data().hostname || "")
+      );
+      if (cleanHost.length >= 3) {
+        try {
+          await deleteDoc(doc(db, "domainRoutes", cleanHost));
+        } catch {
+          // Ignore missing route doc
+        }
+      }
+    }
+    await deleteDoc(domRef);
   } catch (error) {
     handleFirestoreError(
       error,
