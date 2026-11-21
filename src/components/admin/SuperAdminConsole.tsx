@@ -13,6 +13,7 @@ import {
   CreditCard,
   ExternalLink,
   Globe,
+  Inbox,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -33,6 +34,7 @@ import {
   provisionRestaurantInFirestore,
   savePlatformSettingsInFirestore,
   updateRestaurantAdmin,
+  updateSubscriptionRequestStatusInFirestore,
 } from "@/lib/firestore-service";
 import { firebaseConfig } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
@@ -41,10 +43,17 @@ import type {
   PlatformSettings,
   PublicUser,
   Restaurant,
+  SubscriptionRequest,
   TenantStatus,
 } from "@/lib/types";
 
-type AdminTab = "overview" | "restaurants" | "team" | "plans" | "settings";
+type AdminTab =
+  | "overview"
+  | "requests"
+  | "restaurants"
+  | "team"
+  | "plans"
+  | "settings";
 
 export interface AdminRestaurantRow extends Restaurant {
   productCount: number;
@@ -71,6 +80,7 @@ export interface SuperAdminInitialData {
   restaurants: AdminRestaurantRow[];
   platformUsers: PublicUser[];
   allMembers: AdminMemberRow[];
+  subscriptionRequests: SubscriptionRequest[];
   settings: PlatformSettings;
   stats: {
     totalRestaurants: number;
@@ -78,12 +88,15 @@ export interface SuperAdminInitialData {
     totalOrders: number;
     totalProducts: number;
     totalRevenue: number;
+    pendingRequests: number;
   };
 }
 
 interface ProvisionedResult {
   restaurant: Restaurant;
   ownerEmail: string;
+  initialPassword?: string;
+  authStatusNote?: string;
   dashboardPath: string;
   publicMenuPath: string;
 }
@@ -122,7 +135,7 @@ export default function SuperAdminConsole({
   onRefresh: () => Promise<void>;
 }) {
   const router = useRouter();
-  const { signOutUser } = useAuth();
+  const { signOutUser, provisionClientAuthAccount } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -135,6 +148,9 @@ export default function SuperAdminConsole({
   const [allMembers, setAllMembers] = useState<AdminMemberRow[]>(
     initialData.allMembers
   );
+  const [requests, setRequests] = useState<SubscriptionRequest[]>(
+    initialData.subscriptionRequests
+  );
   const [settings, setSettings] = useState<PlatformSettings>(initialData.settings);
   const [stats, setStats] = useState(initialData.stats);
 
@@ -146,6 +162,9 @@ export default function SuperAdminConsole({
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [approvingRequestId, setApprovingRequestId] = useState<string | null>(
+    null
+  );
   const [provisioned, setProvisioned] = useState<ProvisionedResult | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -157,6 +176,7 @@ export default function SuperAdminConsole({
     logoUrl: "",
     ownerName: "",
     ownerEmail: "",
+    initialPassword: "",
     plan: "Growth" as PlanTier,
     currency: "SAR",
     primaryColor: "#c8a66a",
@@ -184,6 +204,7 @@ export default function SuperAdminConsole({
     setRestaurants(initialData.restaurants);
     setPlatformUsers(initialData.platformUsers);
     setAllMembers(initialData.allMembers);
+    setRequests(initialData.subscriptionRequests);
     setSettings(initialData.settings);
     setStats(initialData.stats);
   }, [initialData]);
@@ -210,19 +231,80 @@ export default function SuperAdminConsole({
     setTimeout(() => setCopiedKey(null), 1800);
   }
 
+  function openApproveRequestModal(req: SubscriptionRequest) {
+    setProvisioned(null);
+    setCreateError("");
+    setApprovingRequestId(req.id);
+    setForm({
+      name: req.restaurantName,
+      nameAr: req.restaurantNameAr,
+      slug: req.preferredSlug,
+      description: req.notes || "",
+      logoUrl: req.logoUrl || "",
+      ownerName: req.ownerName,
+      ownerEmail: req.ownerEmail,
+      initialPassword: "",
+      plan: req.plan,
+      currency: req.currency,
+      primaryColor: req.primaryColor || "#c8a66a",
+      branchName: req.city ? `${req.city} · Main Branch` : "Main Branch",
+      customDomain: "",
+    });
+    setCreateOpen(true);
+  }
+
+  async function handleRejectRequest(requestId: string) {
+    await updateSubscriptionRequestStatusInFirestore(requestId, "rejected", "");
+    await refreshPlatform();
+  }
+
   async function handleCreateRestaurant(e: React.FormEvent) {
     e.preventDefault();
     setCreateError("");
     setCreating(true);
     try {
+      const { initialPassword, ...tenantInput } = form;
+      const cleanPass = initialPassword.trim();
+      if (cleanPass && cleanPass.length < 6) {
+        setCreateError(
+          "Initial client password must be at least 6 characters (or leave blank)."
+        );
+        setCreating(false);
+        return;
+      }
+
       const result = await provisionRestaurantInFirestore(
         {
-          ...form,
-          status: "Setup",
+          ...tenantInput,
+          status: "Active",
         },
         initialData.currentUser.id
       );
-      setProvisioned(result);
+
+      let authStatusNote: string | undefined;
+      if (cleanPass) {
+        const authRes = await provisionClientAuthAccount({
+          email: form.ownerEmail,
+          password: cleanPass,
+          fullName: form.ownerName,
+        });
+        authStatusNote = authRes.note;
+      }
+
+      if (approvingRequestId) {
+        await updateSubscriptionRequestStatusInFirestore(
+          approvingRequestId,
+          "approved",
+          result.restaurant.slug
+        );
+        setApprovingRequestId(null);
+      }
+
+      setProvisioned({
+        ...result,
+        initialPassword: cleanPass || undefined,
+        authStatusNote,
+      });
       await refreshPlatform();
       setForm({
         name: "",
@@ -232,6 +314,7 @@ export default function SuperAdminConsole({
         logoUrl: "",
         ownerName: "",
         ownerEmail: "",
+        initialPassword: "",
         plan: "Growth",
         currency: "SAR",
         primaryColor: "#c8a66a",
@@ -304,8 +387,19 @@ export default function SuperAdminConsole({
     router.push("/login");
   }
 
-  const navItems: Array<{ id: AdminTab; label: string; icon: typeof LayoutDashboard }> = [
+  const navItems: Array<{
+    id: AdminTab;
+    label: string;
+    icon: typeof LayoutDashboard;
+    badge?: number;
+  }> = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
+    {
+      id: "requests",
+      label: "Requests",
+      icon: Inbox,
+      badge: stats.pendingRequests > 0 ? stats.pendingRequests : undefined,
+    },
     { id: "restaurants", label: "Restaurants", icon: Building2 },
     { id: "team", label: "Team & roles", icon: Users },
     { id: "plans", label: "Plans & billing", icon: CreditCard },
@@ -321,28 +415,35 @@ export default function SuperAdminConsole({
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col justify-between border-r border-[#252d2b] bg-[#0d1010] p-6 md:flex">
         <div>
           <Link href="/" className="text-xl font-semibold tracking-[0.2em]">
-            QLUB<span className="gold">.</span>
+            VIRAL<span className="gold">.</span>
           </Link>
           <p className="muted mt-1.5 text-[11px] tracking-[0.18em]">
             SUPER ADMIN
           </p>
 
           <nav className="mt-10 space-y-1.5">
-            {navItems.map(({ id, label, icon: Icon }) => {
+            {navItems.map(({ id, label, icon: Icon, badge }) => {
               const active = activeTab === id;
               return (
                 <button
                   key={id}
                   type="button"
                   onClick={() => setActiveTab(id)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm transition-colors ${
+                  className={`flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left text-sm transition-colors ${
                     active
                       ? "bg-[#242b28] font-medium text-[#f5f5f1]"
                       : "text-[#aab4af] hover:bg-[#171d1b] hover:text-[#f5f5f1]"
                   }`}
                 >
-                  <Icon size={17} className={active ? "gold" : ""} />
-                  <span className="whitespace-nowrap">{label}</span>
+                  <span className="flex items-center gap-3">
+                    <Icon size={17} className={active ? "gold" : ""} />
+                    <span className="whitespace-nowrap">{label}</span>
+                  </span>
+                  {badge !== undefined && (
+                    <span className="tabular-nums rounded-md bg-[#c8a66a] px-1.5 py-0.5 text-[11px] font-semibold text-[#10110e]">
+                      {badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -387,7 +488,7 @@ export default function SuperAdminConsole({
               <div>
                 <div className="flex items-center justify-between">
                   <Link href="/" className="text-xl font-semibold tracking-[0.2em]">
-                    QLUB<span className="gold">.</span>
+                    VIRAL<span className="gold">.</span>
                   </Link>
                   <button
                     type="button"
@@ -456,7 +557,9 @@ export default function SuperAdminConsole({
             <button
               type="button"
               onClick={() => {
+                setApprovingRequestId(null);
                 setProvisioned(null);
+                setCreateError("");
                 setCreateOpen(true);
               }}
               className="inline-flex items-center gap-2 whitespace-nowrap shrink-0 rounded-full bg-[#c8a66a] px-5 py-2.5 text-sm font-semibold text-[#111] transition-opacity hover:opacity-90"
@@ -538,6 +641,31 @@ export default function SuperAdminConsole({
                   </p>
                 </div>
               </div>
+
+              {stats.pendingRequests > 0 && (
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#c8a66a]/40 bg-[#17140d] px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <Inbox size={18} className="text-[#c8a66a]" />
+                    <div>
+                      <p className="text-sm font-semibold text-[#f5f5f1]">
+                        {stats.pendingRequests} pending restaurant subscription{" "}
+                        {stats.pendingRequests === 1 ? "request" : "requests"}
+                      </p>
+                      <p className="muted text-xs">
+                        Review submitted restaurant applications and provision
+                        their custom dashboards in one click.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("requests")}
+                    className="rounded-full bg-[#c8a66a] px-5 py-2 text-xs font-semibold text-[#10110e]"
+                  >
+                    Review requests →
+                  </button>
+                </div>
+              )}
 
               <section className="panel mt-8 overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#252d2b] p-5">
@@ -636,6 +764,151 @@ export default function SuperAdminConsole({
                   </table>
                 </div>
               </section>
+            </div>
+          )}
+
+          {/* SUBSCRIPTION REQUESTS */}
+          {activeTab === "requests" && (
+            <div>
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <p className="gold text-xs font-medium tracking-[0.2em]">
+                    INCOMING APPLICATIONS
+                  </p>
+                  <h1 className="font-display mt-2 text-3xl font-semibold">
+                    Restaurant subscription requests
+                  </h1>
+                  <p className="muted mt-1.5 text-sm">
+                    Approve requests to provision an isolated VIRAL workspace,
+                    custom logo, and client login credentials.
+                  </p>
+                </div>
+              </div>
+
+              {requests.length === 0 ? (
+                <div className="panel mt-6 p-10 text-center">
+                  <Inbox size={26} className="mx-auto text-[#c8a66a]" />
+                  <p className="mt-3 text-sm font-medium">
+                    No subscription requests submitted yet.
+                  </p>
+                  <p className="muted mt-1 text-xs">
+                    Restaurant owners can submit applications from the public
+                    subscription form on the landing page.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 grid gap-4">
+                  {requests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="panel flex flex-col justify-between gap-5 p-5 md:flex-row md:items-center"
+                    >
+                      <div className="flex items-start gap-4">
+                        <BrandLogo
+                          logoUrl={req.logoUrl}
+                          logoText={
+                            req.restaurantName.trim().charAt(0).toUpperCase() ||
+                            "Q"
+                          }
+                          alt={req.restaurantName}
+                          accentColor={req.primaryColor}
+                          size="md"
+                        />
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <h3 className="text-base font-semibold text-[#f5f5f1]">
+                              {req.restaurantName}
+                            </h3>
+                            {req.restaurantNameAr && (
+                              <span className="text-xs text-[#aab4af]" dir="rtl">
+                                ({req.restaurantNameAr})
+                              </span>
+                            )}
+                            <span
+                              className={`rounded-md px-2 py-0.5 text-[11px] font-medium capitalize ${
+                                req.status === "approved"
+                                  ? "bg-[#13221b] text-[#86efac]"
+                                  : req.status === "rejected"
+                                    ? "bg-red-950/50 text-red-300"
+                                    : "bg-[#1d1810] text-[#e5c991]"
+                              }`}
+                            >
+                              {req.status}
+                            </span>
+                          </div>
+                          <p className="muted text-xs">
+                            Owner: <span className="text-[#f5f5f1]">{req.ownerName}</span>{" "}
+                            ·{" "}
+                            <span className="font-mono-num text-[#c8a66a]">
+                              {req.ownerEmail}
+                            </span>{" "}
+                            · {req.phone}
+                          </p>
+                          <p className="muted text-xs">
+                            Slug:{" "}
+                            <span className="font-mono-num text-[#f5f5f1]">
+                              {req.preferredSlug}.viral.app
+                            </span>{" "}
+                            · Plan: {req.plan} ({req.currency}) ·{" "}
+                            {req.branchCount}{" "}
+                            {req.branchCount === 1 ? "branch" : "branches"}
+                            {req.city ? ` · ${req.city}` : ""}
+                          </p>
+                          {req.notes && (
+                            <p className="muted pt-1 text-xs italic">
+                              &ldquo;{req.notes}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+                        {req.status === "approved" && req.provisionedSlug ? (
+                          <>
+                            <Link
+                              href={`/dashboard/${req.provisionedSlug}`}
+                              className="rounded-full bg-[#c8a66a] px-4 py-2 text-xs font-semibold text-[#10110e]"
+                            >
+                              Open dashboard →
+                            </Link>
+                            <Link
+                              href={`/r/${req.provisionedSlug}`}
+                              className="rounded-full border border-[#39413e] px-4 py-2 text-xs font-medium text-[#f5f5f1]"
+                            >
+                              Menu
+                            </Link>
+                          </>
+                        ) : req.status === "pending" ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openApproveRequestModal(req)}
+                              className="rounded-full bg-[#c8a66a] px-5 py-2 text-xs font-semibold text-[#10110e] hover:opacity-90"
+                            >
+                              Approve &amp; Create Dashboard
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleRejectRequest(req.id)}
+                              className="rounded-full border border-[#39413e] px-4 py-2 text-xs font-medium text-[#9aa6a1] hover:border-red-400/50 hover:text-red-300"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openApproveRequestModal(req)}
+                            className="rounded-full border border-[#39413e] px-4 py-2 text-xs font-medium text-[#aab4af] hover:border-[#c8a66a] hover:text-[#f5f5f1]"
+                          >
+                            Re-approve &amp; Provision
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -891,7 +1164,7 @@ export default function SuperAdminConsole({
                       <input
                         type="email"
                         required
-                        placeholder="operator@qlub.app"
+                        placeholder="operator@viral.app"
                         value={teamForm.email}
                         onChange={(e) =>
                           setTeamForm({ ...teamForm, email: e.target.value })
@@ -966,7 +1239,7 @@ export default function SuperAdminConsole({
                 SUBSCRIPTION ARCHITECTURE
               </p>
               <h1 className="font-display mt-2 text-3xl font-semibold">
-                White-label plans & tenant allocation
+                Plans & tenant allocation
               </h1>
 
               <div className="mt-6 grid gap-5 lg:grid-cols-3">
@@ -1207,13 +1480,18 @@ export default function SuperAdminConsole({
                     </div>
 
                     <div className="border-t border-[#252d2b] pt-3">
-                      <span className="muted">Authorized Google account</span>
+                      <span className="muted">Authorized client credentials</span>
                       <p className="font-mono-num mt-1 text-[#f5f5f1]">
                         Owner Email: {provisioned.ownerEmail}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-[#86efac]">
-                        Pre-invited: signing in with Google using this email
-                        automatically claims dashboard admin access.
+                      {provisioned.initialPassword && (
+                        <p className="font-mono-num mt-1 text-[#f5f5f1]">
+                          Initial Password: {provisioned.initialPassword}
+                        </p>
+                      )}
+                      <p className="mt-1 text-[11px] text-[#86efac]">
+                        {provisioned.authStatusNote ||
+                          "Pre-invited: signing in on the dashboard login page claims admin access automatically."}
                       </p>
                     </div>
                   </div>
@@ -1222,7 +1500,10 @@ export default function SuperAdminConsole({
                     <button
                       type="button"
                       onClick={() => {
-                        const msg = `Welcome to QLUB!\nDashboard: ${origin}${provisioned.dashboardPath}\nPublic Menu: ${origin}${provisioned.publicMenuPath}\nAuthorized Google Email: ${provisioned.ownerEmail}`;
+                        const pwdLine = provisioned.initialPassword
+                          ? `\nPassword: ${provisioned.initialPassword}`
+                          : "";
+                        const msg = `Welcome to VIRAL!\nDashboard: ${origin}${provisioned.dashboardPath}\nPublic Menu: ${origin}${provisioned.publicMenuPath}\nSubdomain: https://${provisioned.restaurant.slug}.viral.app\nOwner Email: ${provisioned.ownerEmail}${pwdLine}`;
                         copyText("all", msg);
                       }}
                       className="rounded-full border border-[#39413e] px-5 py-2.5 text-xs font-medium"
@@ -1328,6 +1609,21 @@ export default function SuperAdminConsole({
                         className="h-10 w-full rounded-xl border border-[#252d2b] bg-[#0d1010] px-3 text-sm"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-[#aab4af]">
+                      Create client login password (optional, min 6 chars)
+                    </label>
+                    <input
+                      type="text"
+                      value={form.initialPassword}
+                      onChange={(e) =>
+                        setForm({ ...form, initialPassword: e.target.value })
+                      }
+                      placeholder="Leave blank for Google sign-in, or enter initial password for Email login"
+                      className="font-mono-num h-10 w-full rounded-xl border border-[#252d2b] bg-[#0d1010] px-3 text-xs"
+                    />
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-3">

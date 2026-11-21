@@ -972,12 +972,12 @@ export default function RestaurantDashboard({
                       </div>
                       <div className="flex items-center justify-between gap-2 rounded-xl border border-[#252d2b] bg-[#0d1010] px-3.5 py-2.5">
                         <span className="font-mono-num truncate text-xs text-[#aab4af]">
-                          https://{restaurant.slug}.qlub.app
+                          https://{restaurant.slug}.viral.app
                         </span>
                         <button
                           type="button"
                           onClick={() =>
-                            copyValue("sub", `https://${restaurant.slug}.qlub.app`)
+                            copyValue("sub", `https://${restaurant.slug}.viral.app`)
                           }
                           className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 text-xs font-medium text-[#c8a66a]"
                         >
@@ -1977,7 +1977,7 @@ export default function RestaurantDashboard({
             <div className="grid gap-8 lg:grid-cols-2">
               <section className="panel p-6">
                 <p className="gold text-xs font-medium tracking-[0.2em]">
-                  WHITE-LABEL HOSTNAME
+                  CUSTOM HOSTNAME
                 </p>
                 <h2 className="mt-1 text-xl font-semibold">Custom domains</h2>
                 <p className="muted mt-1 text-xs leading-5">
@@ -1989,10 +1989,10 @@ export default function RestaurantDashboard({
                 </p>
 
                 <div className="mt-4 rounded-xl border border-[#252d2b] bg-[#0d1010] p-3.5 text-xs">
-                  <span className="muted">Built-in white-label subdomain</span>
+                  <span className="muted">Built-in subdomain</span>
                   <div className="mt-1 flex items-center justify-between gap-3">
                     <span className="font-mono-num text-[#f5f5f1]">
-                      {restaurant.slug}.qlub.app
+                      {restaurant.slug}.viral.app
                     </span>
                     <Link
                       href={`/r/${restaurant.slug}`}

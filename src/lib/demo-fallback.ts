@@ -14,9 +14,9 @@ import type {
 export const BOOT_ADMIN_EMAIL = "robaalali86@gmail.com";
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
-  platformName: "QLUB Platform",
-  supportEmail: "support@qlub.app",
-  defaultCnameTarget: "menus.qlub.app",
+  platformName: "VIRAL Platform",
+  supportEmail: "support@viral.app",
+  defaultCnameTarget: "menus.viral.app",
   allowSelfServiceOrdering: true,
   defaultCurrency: "SAR",
 };

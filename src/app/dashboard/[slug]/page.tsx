@@ -98,7 +98,16 @@ export default function DashboardPage() {
           </p>
 
           <div className="mt-6">
-            <AuthFormPanel submitLabel={`Sign in to /${slug}`} />
+            <AuthFormPanel
+              allowCreateAccount={false}
+              submitLabel={`Sign in to /${slug}`}
+            />
+            <p className="muted mt-4 text-center text-xs">
+              Need your own restaurant dashboard?{" "}
+              <Link href="/#subscribe" className="text-[#c8a66a] hover:underline">
+                Request subscription
+              </Link>
+            </p>
           </div>
         </div>
       </main>

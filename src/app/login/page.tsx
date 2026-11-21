@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, LogOut, ShieldCheck, Store } from "lucide-react";
 import AuthFormPanel from "@/components/AuthFormPanel";
 import { useAuth } from "@/components/AuthProvider";
-import { BOOT_ADMIN_EMAIL } from "@/lib/demo-fallback";
 import type { PublicUser } from "@/lib/types";
 
 function LoginForm() {
@@ -41,28 +40,34 @@ function LoginForm() {
     <main className="min-h-screen bg-[#090b0b] px-5 py-12">
       <div className="mx-auto flex max-w-5xl items-center justify-between">
         <Link href="/" className="text-xl font-semibold tracking-[0.22em]">
-          QLUB<span className="gold">.</span>
+          VIRAL<span className="gold">.</span>
         </Link>
-        <Link
-          href="/r/the-house"
-          className="text-sm text-[#9aa6a1] transition-colors hover:text-[#f5f5f1]"
-        >
-          View public menu demo
-        </Link>
+        <div className="flex items-center gap-5 text-sm text-[#9aa6a1]">
+          <Link href="/#subscribe" className="transition-colors hover:text-[#c8a66a]">
+            Request Subscription
+          </Link>
+          <Link
+            href="/r/the-house"
+            className="transition-colors hover:text-[#f5f5f1]"
+          >
+            View public menu demo
+          </Link>
+        </div>
       </div>
 
       <div className="mx-auto mt-12 grid max-w-5xl items-stretch gap-8 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="panel flex flex-col justify-between p-7 md:p-9">
           <div>
             <p className="gold text-xs font-medium tracking-[0.2em]">
-              WORKSPACE ACCESS
+              CLIENT WORKSPACE ACCESS
             </p>
             <h1 className="font-display mt-3 text-4xl font-semibold">
-              Sign in to QLUB
+              Sign in to VIRAL
             </h1>
             <p className="muted mt-2 text-sm leading-6">
-              Sign in with Email &amp; Password or Google to enter the Super
-              Admin console or your restaurant&apos;s white-label dashboard.
+              Sign in with the Email &amp; Password or Google account assigned by
+              the platform administrator to enter your restaurant&apos;s
+              dedicated dashboard.
             </p>
 
             {isAuthReady && publicUser && isEmailVerified ? (
@@ -103,7 +108,7 @@ function LoginForm() {
                       href="/admin"
                       className="text-xs font-medium text-[#c8a66a] hover:underline"
                     >
-                      Go directly to Super Admin console →
+                      Open Super Admin console →
                     </Link>
                   </div>
                 )}
@@ -111,6 +116,7 @@ function LoginForm() {
             ) : (
               <div className="mt-7">
                 <AuthFormPanel
+                  allowCreateAccount={false}
                   submitLabel="Sign in with Email & Password"
                   onAuthenticated={handleSuccessRedirect}
                 />
@@ -120,8 +126,7 @@ function LoginForm() {
 
           <p className="muted mt-8 border-t border-[#252d2b] pt-5 text-xs leading-5">
             Protected by Firebase Authentication and Firestore tenant security
-            rules. Only verified emails authorized for a restaurant or platform
-            role gain dashboard write access.
+            rules. Accounts are created exclusively by platform administrators.
           </p>
         </section>
 
@@ -129,46 +134,43 @@ function LoginForm() {
           <div>
             <div className="flex items-center gap-2 text-xs font-medium tracking-[0.18em] text-[#c8a66a]">
               <ShieldCheck size={14} />
-              <span>ROLE-BASED ACCESS CONTROL</span>
+              <span>ADMIN-PROVISIONED ACCESS</span>
             </div>
             <h2 className="mt-3 text-xl font-semibold">
-              Super Admin &amp; Restaurant Onboarding
+              Dedicated restaurant workspaces
             </h2>
             <p className="muted mt-2 text-sm leading-6">
-              Access resolves automatically from your verified Firebase account.
+              To preserve tenant isolation, public self-registration is disabled.
             </p>
 
             <div className="mt-6 space-y-3">
-              <div className="rounded-xl border border-[#252d2b] bg-[#151a19] p-4">
-                <p className="text-sm font-semibold text-[#f5f5f1]">
-                  Platform Super Admin
-                </p>
-                <p className="muted mt-1 text-xs leading-5">
-                  Sign in with{" "}
-                  <span className="font-mono-num text-[#c8a66a]">
-                    {BOOT_ADMIN_EMAIL}
-                  </span>{" "}
-                  (Email &amp; Password or Google) to create restaurants, assign
-                  owners, and manage platform billing &amp; domains.
-                </p>
-                <Link
-                  href="/admin"
-                  className="mt-2.5 inline-block text-xs font-medium text-[#c8a66a] hover:underline"
-                >
-                  Open Super Admin sign-in →
-                </Link>
-              </div>
-
               <div className="rounded-xl border border-[#252d2b] bg-[#151a19] p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[#f5f5f1]">
                   <Store size={15} className="text-[#c8a66a]" />
                   <span>Restaurant Owners &amp; Staff</span>
                 </div>
                 <p className="muted mt-1 text-xs leading-5">
-                  Any restaurant owner or team email invited in Super Admin or
-                  Team Settings claims their isolated dashboard automatically
-                  after verifying their email.
+                  Once your subscription request is approved, sign in using your
+                  assigned credentials to add, edit, or delete menu items, upload
+                  your custom logo, and publish your storefront.
                 </p>
+              </div>
+
+              <div className="rounded-xl border border-[#252d2b] bg-[#151a19] p-4">
+                <p className="text-sm font-semibold text-[#f5f5f1]">
+                  New restaurant partner?
+                </p>
+                <p className="muted mt-1 text-xs leading-5">
+                  Don&apos;t have a workspace yet? Submit a restaurant
+                  subscription request and our team will provision your custom
+                  dashboard.
+                </p>
+                <Link
+                  href="/#subscribe"
+                  className="mt-2.5 inline-block text-xs font-medium text-[#c8a66a] hover:underline"
+                >
+                  Request subscription dashboard →
+                </Link>
               </div>
             </div>
           </div>

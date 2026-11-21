@@ -1,4 +1,4 @@
-# QLUB Firestore Security Specification (Phase 0)
+# VIRAL Firestore Security Specification (Phase 0)
 
 ## 1. Data Invariants
 1. **Default Deny**: All unmatched Firestore paths are strictly denied.

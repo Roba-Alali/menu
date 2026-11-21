@@ -3,9 +3,9 @@ import AuthProvider from "@/components/AuthProviderWrapper";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "QLUB Platform — White-Label Restaurant SaaS",
+  title: "VIRAL Platform — Restaurant SaaS Platform",
   description:
-    "Multi-tenant white-label digital menus, QR table ordering, brand editor, and operations console for restaurant portfolios.",
+    "Multi-tenant digital menus, QR table ordering, brand editor, and operations console for restaurant portfolios.",
 };
 
 export default function RootLayout({

@@ -188,3 +188,26 @@ export interface RestaurantBundle {
   members: RestaurantMember[];
   orders: Order[];
 }
+
+export type SubscriptionRequestStatus = "pending" | "approved" | "rejected";
+
+export interface SubscriptionRequest {
+  id: string;
+  restaurantName: string;
+  restaurantNameAr: string;
+  preferredSlug: string;
+  ownerName: string;
+  ownerEmail: string;
+  phone: string;
+  city: string;
+  branchCount: number;
+  plan: PlanTier;
+  currency: string;
+  primaryColor: string;
+  logoUrl: string;
+  notes: string;
+  status: SubscriptionRequestStatus;
+  provisionedSlug: string;
+  createdAt: string;
+  updatedAt: string;
+}

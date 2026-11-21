@@ -9,7 +9,9 @@ import {
   ShieldCheck,
   Store,
 } from "lucide-react";
+import AdminHashRedirect from "@/components/AdminHashRedirect";
 import LandingPreview from "@/components/LandingPreview";
+import SubscriptionRequestForm from "@/components/SubscriptionRequestForm";
 import { getStarterSeedDataset } from "@/lib/demo-fallback";
 
 const modules = [
@@ -21,12 +23,12 @@ const modules = [
   {
     icon: Palette,
     title: "Visual brand editor",
-    text: "Restaurant owners customize palette, typography accents, currency, and cover imagery with live preview.",
+    text: "Restaurant owners upload their custom logo, customize palette, currency, and cover imagery with live preview.",
   },
   {
     icon: ClipboardList,
     title: "Catalog & modifiers",
-    text: "Manage categories, dishes, allergens, availability, and custom add-on option groups in real time.",
+    text: "Add, edit, or delete categories, dishes, allergens, availability, and custom add-on option groups in real time.",
   },
   {
     icon: QrCode,
@@ -41,30 +43,30 @@ const modules = [
   {
     icon: ShieldCheck,
     title: "Multi-tenant isolation",
-    text: "Platform super-admin provisioning, Google Auth role-based staff access, and custom domain verification.",
+    text: "Admin-provisioned workspaces, isolated client login dashboards, and custom domain routing.",
   },
 ];
 
 const steps = [
   {
     num: "01",
-    title: "Provision a restaurant tenant",
-    text: "Create the restaurant from Super Admin. Starter categories, main branch, QR code, and owner invite generate automatically.",
+    title: "Submit subscription request",
+    text: "Restaurant owners send their brand details, preferred slug, custom logo, and contact email using the form below.",
   },
   {
     num: "02",
-    title: "Send the client workspace link",
-    text: "Share the dedicated dashboard URL with the restaurant owner for one-click Google sign-in and self-service onboarding.",
+    title: "Receive dedicated dashboard",
+    text: "Once approved and provisioned, you receive your private client login page and isolated restaurant workspace URL.",
   },
   {
     num: "03",
-    title: "Customize brand, menu & QR",
-    text: "Owners edit colors, dishes, modifiers, and branches with an instant live menu preview—zero engineering needed.",
+    title: "Customize logo, brand & menu",
+    text: "Add, edit, or delete products, upload dish photos, and tune your brand palette with instant live preview.",
   },
   {
     num: "04",
     title: "Publish & accept live orders",
-    text: "Flip the menu live on its slug or custom domain and track incoming dine-in and pickup orders immediately.",
+    text: "Go live on your branded subdomain or custom domain and receive QR dine-in and pickup orders immediately.",
   },
 ];
 
@@ -88,6 +90,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
+      <AdminHashRedirect />
+
       {/* Top Bar Contract: 3 zones */}
       <header className="border-b border-[#252d2b]">
         <div className="container flex h-20 items-center justify-between gap-8">
@@ -95,7 +99,7 @@ export default function Home() {
             href="/"
             className="whitespace-nowrap shrink-0 text-xl font-semibold tracking-[0.22em]"
           >
-            QLUB<span className="gold">.</span>
+            VIRAL<span className="gold">.</span>
           </Link>
 
           <nav className="hidden items-center gap-7 text-sm text-[#aab4af] md:flex">
@@ -117,6 +121,12 @@ export default function Home() {
             >
               Modules
             </a>
+            <a
+              href="#subscribe"
+              className="whitespace-nowrap shrink-0 transition-colors hover:text-[#f5f5f1]"
+            >
+              Subscribe
+            </a>
             <Link
               href="/r/the-house"
               className="whitespace-nowrap shrink-0 transition-colors hover:text-[#f5f5f1]"
@@ -127,11 +137,17 @@ export default function Home() {
 
           <div className="flex items-center gap-3 shrink-0">
             <Link
-              href="/admin"
+              href="/login"
+              className="hidden whitespace-nowrap shrink-0 text-sm text-[#aab4af] transition-colors hover:text-[#f5f5f1] sm:inline-block"
+            >
+              Client Sign In
+            </Link>
+            <a
+              href="#subscribe"
               className="inline-flex items-center gap-2 whitespace-nowrap shrink-0 rounded-full border border-[#c8a66a] px-5 py-2.5 text-sm font-medium text-[#e5c991] transition-colors hover:bg-[#c8a66a] hover:text-[#10110e]"
             >
-              Platform dashboard <ArrowUpRight size={15} />
-            </Link>
+              Request Subscription <ArrowUpRight size={15} />
+            </a>
           </div>
         </div>
       </header>
@@ -143,7 +159,7 @@ export default function Home() {
       >
         <div className="flex flex-col justify-center">
           <p className="text-xs font-medium tracking-[0.22em] text-[#d6b77d]">
-            WHITE-LABEL RESTAURANT PLATFORM
+            RESTAURANT PLATFORM
           </p>
           <h1
             className="font-display mt-4 max-w-2xl text-5xl font-semibold leading-[1.06] tracking-tight md:text-6xl"
@@ -153,23 +169,22 @@ export default function Home() {
             <span className="gold">Every restaurant brand.</span>
           </h1>
           <p className="muted mt-6 max-w-xl text-base leading-7 md:text-lg">
-            Provision independent restaurant websites, self-service client
-            dashboards, QR table ordering, and multi-branch catalogs from a
-            single multi-tenant control plane.
+            Launch your independent restaurant website, dedicated client
+            dashboard, custom logo branding, and QR table ordering.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link
-              href="/admin"
+            <a
+              href="#subscribe"
               className="whitespace-nowrap shrink-0 rounded-full bg-[#c8a66a] px-7 py-3.5 text-sm font-semibold text-[#10110e] transition-opacity hover:opacity-90"
             >
-              Open Super Admin
-            </Link>
+              Request Your Dashboard
+            </a>
             <Link
               href="/login"
               className="whitespace-nowrap shrink-0 rounded-full border border-[#39413e] px-6 py-3.5 text-sm font-medium text-[#f5f5f1] transition-colors hover:border-[#c8a66a]"
             >
-              Sign in to workspace
+              Client Workspace Login
             </Link>
             <Link
               href="/r/the-house"
@@ -211,16 +226,16 @@ export default function Home() {
           <div className="grid items-end gap-8 lg:grid-cols-[1.1fr_0.9fr]">
             <div>
               <p className="gold text-xs font-medium tracking-[0.22em]">
-                SELF-SERVICE WORKFLOW
+                CLIENT ONBOARDING WORKFLOW
               </p>
               <h2 className="font-display mt-3 text-3xl font-semibold md:text-4xl">
-                Launch a client restaurant in under two minutes.
+                Launch your branded restaurant dashboard seamlessly.
               </h2>
             </div>
             <p className="muted text-sm leading-6">
-              Platform owners create the tenant once. Each restaurant receives
-              its own isolated dashboard URL, brand editor, menu manager, and
-              scannable table QR codes.
+              Submit your restaurant details once. When provisioned by our team,
+              you gain full control of your isolated dashboard URL, custom logo,
+              menu catalog, and scannable table QR codes.
             </p>
           </div>
 
@@ -251,15 +266,15 @@ export default function Home() {
               PLATFORM MODULES
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold md:text-4xl">
-              Everything your restaurant clients need.
+              Everything your restaurant brand needs.
             </h2>
           </div>
-          <Link
-            href="/dashboard/the-house"
+          <a
+            href="#subscribe"
             className="inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 text-sm font-medium text-[#c8a66a]"
           >
-            Inspect client dashboard <ArrowUpRight size={15} />
-          </Link>
+            Apply for a workspace <ArrowUpRight size={15} />
+          </a>
         </div>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -281,9 +296,9 @@ export default function Home() {
               Designed for dining rooms, cafes, and multi-branch groups.
             </h3>
             <p className="muted mt-3 max-w-xl text-sm leading-6">
-              Try the live storefront for The House or jump straight into Super
-              Admin to provision a brand-new restaurant workspace and test the
-              full owner handoff flow.
+              Preview the live storefront for The House or submit your
+              subscription request below to receive your own dedicated
+              dashboard and login page.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
@@ -293,10 +308,10 @@ export default function Home() {
                 Preview The House menu
               </Link>
               <Link
-                href="/admin"
+                href="/login"
                 className="whitespace-nowrap shrink-0 rounded-full border border-[#39413e] px-6 py-2.5 text-sm font-medium"
               >
-                Create new restaurant
+                Client sign in
               </Link>
             </div>
           </div>
@@ -311,18 +326,28 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Subscription Request Form */}
+      <section
+        id="subscribe"
+        className="border-t border-[#252d2b] bg-[#0d1010] py-20"
+      >
+        <div className="container">
+          <SubscriptionRequestForm />
+        </div>
+      </section>
+
       <footer className="border-t border-[#252d2b] py-8">
         <div className="container flex flex-wrap items-center justify-between gap-4 text-xs text-[#8e9994]">
           <div className="flex items-center gap-3">
             <Building2 size={14} className="gold" />
-            <span>QLUB PLATFORM · MULTI-TENANT RESTAURANT SAAS</span>
+            <span>VIRAL PLATFORM · MULTI-TENANT RESTAURANT SAAS</span>
           </div>
           <div className="flex items-center gap-6">
+            <a href="#subscribe" className="hover:text-[#f5f5f1]">
+              Request Subscription
+            </a>
             <Link href="/login" className="hover:text-[#f5f5f1]">
-              Sign in
-            </Link>
-            <Link href="/admin" className="hover:text-[#f5f5f1]">
-              Super Admin
+              Client Sign In
             </Link>
             <Link href="/r/the-house" className="hover:text-[#f5f5f1]">
               Live Demo

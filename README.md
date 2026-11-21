@@ -1,9 +1,9 @@
-# Qlub White-Label Platform — Foundation
+# Viral Restaurant Platform — Foundation
 
-A multi-tenant restaurant SaaS foundation built with Next.js, TypeScript, Supabase and Tailwind CSS.
+A multi-tenant restaurant SaaS foundation built with Next.js, TypeScript, Firebase and Tailwind CSS.
 
 ## Included in this foundation
-- Premium dark landing page and Qlub-inspired visual direction.
+- Premium dark landing page and Viral visual direction.
 - Platform admin dashboard concept with sample tenant records.
 - Public restaurant menu demo.
 - Supabase browser/server client helpers.

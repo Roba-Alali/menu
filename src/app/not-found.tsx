@@ -9,7 +9,7 @@ export default function NotFound() {
           Page not found
         </h1>
         <p className="muted mt-2 text-sm">
-          The requested QLUB workspace or restaurant page could not be located.
+          The requested VIRAL workspace or restaurant page could not be located.
         </p>
         <div className="mt-6 flex justify-center gap-3">
           <Link

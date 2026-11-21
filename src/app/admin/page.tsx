@@ -121,7 +121,7 @@ export default function AdminPage() {
   if (!data) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#090b0b] text-sm text-[#9aa6a1]">
-        {loadingData ? "Loading QLUB Firestore control plane..." : "Initializing workspace..."}
+        {loadingData ? "Loading VIRAL Firestore control plane..." : "Initializing workspace..."}
       </main>
     );
   }

@@ -40,20 +40,20 @@ export function middleware(req: NextRequest) {
   if (
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
-    hostname === "qlub.app" ||
-    hostname === "www.qlub.app" ||
-    hostname === "menus.qlub.app" ||
+    hostname === "viral.app" ||
+    hostname === "www.viral.app" ||
+    hostname === "menus.viral.app" ||
     hostname.endsWith(".run.app") ||
     /^\d+\.\d+\.\d+\.\d+$/.test(hostname)
   ) {
     return NextResponse.next();
   }
 
-  // Subdomain storefronts: <slug>.localhost or <slug>.qlub.app
+  // Subdomain storefronts: <slug>.localhost or <slug>.viral.app
   const parts = hostname.split(".");
   if (
     (parts.length === 2 && parts[1] === "localhost") ||
-    (parts.length === 3 && parts[1] === "qlub" && parts[2] === "app")
+    (parts.length === 3 && parts[1] === "viral" && parts[2] === "app")
   ) {
     const sub = parts[0];
     if (sub && !RESERVED_SUBDOMAINS.has(sub) && /^[a-z0-9-]+$/.test(sub)) {

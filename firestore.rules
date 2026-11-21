@@ -237,6 +237,29 @@ service cloud.firestore {
         data.updatedAt is timestamp;
     }
 
+    function isValidSubscriptionRequest(data) {
+      return data.keys().hasAll(['id', 'restaurantName', 'restaurantNameAr', 'preferredSlug', 'ownerName', 'ownerEmail', 'phone', 'city', 'branchCount', 'plan', 'currency', 'primaryColor', 'logoUrl', 'notes', 'status', 'provisionedSlug', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'restaurantName', 'restaurantNameAr', 'preferredSlug', 'ownerName', 'ownerEmail', 'phone', 'city', 'branchCount', 'plan', 'currency', 'primaryColor', 'logoUrl', 'notes', 'status', 'provisionedSlug', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) &&
+        data.restaurantName is string && data.restaurantName.size() >= 1 && data.restaurantName.size() <= 120 &&
+        data.restaurantNameAr is string && data.restaurantNameAr.size() <= 120 &&
+        data.preferredSlug is string && data.preferredSlug.size() >= 1 && data.preferredSlug.size() <= 100 && data.preferredSlug.matches('^[a-z0-9\\-]+$') &&
+        data.ownerName is string && data.ownerName.size() >= 1 && data.ownerName.size() <= 120 &&
+        data.ownerEmail is string && data.ownerEmail.size() >= 3 && data.ownerEmail.size() <= 200 &&
+        data.phone is string && data.phone.size() >= 3 && data.phone.size() <= 40 &&
+        data.city is string && data.city.size() <= 100 &&
+        data.branchCount is number && data.branchCount >= 1 && data.branchCount <= 500 &&
+        data.plan in ['Starter', 'Growth', 'Enterprise'] &&
+        data.currency in ['SAR', 'AED', 'USD', 'EUR'] &&
+        data.primaryColor is string && data.primaryColor.size() >= 4 && data.primaryColor.size() <= 20 &&
+        data.logoUrl is string && data.logoUrl.size() <= 200000 && (data.logoUrl == '' || data.logoUrl.matches('^(https?://|/|data:image/(png|jpeg|jpg|webp|gif);base64,).*')) &&
+        data.notes is string && data.notes.size() <= 600 &&
+        data.status in ['pending', 'approved', 'rejected'] &&
+        data.provisionedSlug is string && data.provisionedSlug.size() <= 100 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
     // --- Collection Rules ---
     match /users/{userId} {
       allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
@@ -289,6 +312,24 @@ service cloud.firestore {
       allow delete: if isValidDomainHost(hostname) && (
         isAdmin() || isRestaurantWriter(existing().slug)
       );
+    }
+
+    match /subscriptionRequests/{requestId} {
+      allow get: if isAdmin() && isValidId(requestId);
+      allow list: if isAdmin();
+      allow create: if isValidId(requestId) && isValidSubscriptionRequest(incoming()) &&
+        incoming().id == requestId &&
+        incoming().status == 'pending' &&
+        incoming().provisionedSlug == '' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(requestId) &&
+        isValidSubscriptionRequest(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'provisionedSlug', 'updatedAt']);
+      allow delete: if isAdmin() && isValidId(requestId);
     }
 
     match /restaurants/{slug} {

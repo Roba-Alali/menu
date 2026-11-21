@@ -75,7 +75,7 @@ function CustomDomainMenuContent() {
               href="/"
               className="rounded-full border border-[#39413e] px-5 py-2.5 text-xs font-medium"
             >
-              QLUB Home
+              VIRAL Home
             </Link>
           </div>
         </div>

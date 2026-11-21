@@ -38,6 +38,8 @@ import type {
   RestaurantDomain,
   RestaurantMember,
   RestaurantRole,
+  SubscriptionRequest,
+  SubscriptionRequestStatus,
   TenantStatus,
 } from "./types";
 
@@ -215,6 +217,36 @@ function mapOrder(id: string, data: Record<string, unknown>): Order {
     notes: String(data.notes || ""),
     items: Array.isArray(data.items) ? (data.items as OrderItem[]) : [],
     ownerUid: String(data.ownerUid || ""),
+    createdAt: safeTimestampToIso(data.createdAt),
+    updatedAt: safeTimestampToIso(data.updatedAt),
+  };
+}
+
+function mapSubscriptionRequest(
+  id: string,
+  data: Record<string, unknown>
+): SubscriptionRequest {
+  return {
+    id: String(data.id || id),
+    restaurantName: String(data.restaurantName || ""),
+    restaurantNameAr: String(data.restaurantNameAr || ""),
+    preferredSlug: String(data.preferredSlug || ""),
+    ownerName: String(data.ownerName || ""),
+    ownerEmail: String(data.ownerEmail || ""),
+    phone: String(data.phone || ""),
+    city: String(data.city || ""),
+    branchCount: Number(data.branchCount ?? 1),
+    plan: (["Starter", "Growth", "Enterprise"].includes(String(data.plan))
+      ? String(data.plan)
+      : "Growth") as PlanTier,
+    currency: String(data.currency || "SAR"),
+    primaryColor: String(data.primaryColor || "#c8a66a"),
+    logoUrl: typeof data.logoUrl === "string" ? data.logoUrl : "",
+    notes: String(data.notes || ""),
+    status: (["pending", "approved", "rejected"].includes(String(data.status))
+      ? String(data.status)
+      : "pending") as SubscriptionRequestStatus,
+    provisionedSlug: String(data.provisionedSlug || ""),
     createdAt: safeTimestampToIso(data.createdAt),
     updatedAt: safeTimestampToIso(data.updatedAt),
   };
@@ -585,6 +617,87 @@ export async function placePublicOrderInFirestore(input: {
   }
 }
 
+export async function submitSubscriptionRequestInFirestore(input: {
+  restaurantName: string;
+  restaurantNameAr?: string;
+  preferredSlug?: string;
+  ownerName: string;
+  ownerEmail: string;
+  phone: string;
+  city?: string;
+  branchCount?: number;
+  plan?: PlanTier;
+  currency?: string;
+  primaryColor?: string;
+  logoUrl?: string;
+  notes?: string;
+}): Promise<SubscriptionRequest> {
+  const id = makeId("req");
+  const cleanRestaurantName = clamp(input.restaurantName, 120);
+  const cleanOwnerName = clamp(input.ownerName, 120);
+  const cleanEmail = clamp(input.ownerEmail.toLowerCase(), 200);
+  const cleanPhone = clamp(input.phone, 40);
+
+  if (!cleanRestaurantName || !cleanOwnerName || !cleanEmail.includes("@") || cleanPhone.length < 3) {
+    throw new Error(
+      "Please complete restaurant name, owner full name, valid email, and phone number."
+    );
+  }
+
+  const preferredSlug = slugify(input.preferredSlug || cleanRestaurantName);
+  const plan: PlanTier = ["Starter", "Growth", "Enterprise"].includes(
+    input.plan || "Growth"
+  )
+    ? (input.plan as PlanTier)
+    : "Growth";
+  const currency = ["SAR", "AED", "USD", "EUR"].includes(
+    input.currency || "SAR"
+  )
+    ? (input.currency as string)
+    : "SAR";
+  const branchCount = Math.max(
+    1,
+    Math.min(500, Math.floor(Number(input.branchCount) || 1))
+  );
+  const nowIso = new Date().toISOString();
+
+  const payload = {
+    id,
+    restaurantName: cleanRestaurantName,
+    restaurantNameAr: clamp(input.restaurantNameAr, 120),
+    preferredSlug,
+    ownerName: cleanOwnerName,
+    ownerEmail: cleanEmail,
+    phone: cleanPhone,
+    city: clamp(input.city, 100),
+    branchCount,
+    plan,
+    currency,
+    primaryColor: clamp(input.primaryColor, 20, "#c8a66a"),
+    logoUrl: clamp(input.logoUrl, 200000),
+    notes: clamp(input.notes, 600),
+    status: "pending" as const,
+    provisionedSlug: "",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  try {
+    await setDoc(doc(db, "subscriptionRequests", id), payload);
+    return {
+      ...payload,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+  } catch (error) {
+    handleFirestoreError(
+      error,
+      OperationType.CREATE,
+      `subscriptionRequests/${id}`
+    );
+  }
+}
+
 // ============================================================
 // SUPER ADMIN OPERATIONS
 // ============================================================
@@ -783,6 +896,7 @@ export interface SuperAdminPayload {
     restaurantName: string;
     restaurantSlug: string;
   }>;
+  subscriptionRequests: SubscriptionRequest[];
   settings: PlatformSettings;
   stats: {
     totalRestaurants: number;
@@ -790,15 +904,17 @@ export interface SuperAdminPayload {
     totalOrders: number;
     totalProducts: number;
     totalRevenue: number;
+    pendingRequests: number;
   };
 }
 
 export async function fetchSuperAdminPlatformData(): Promise<SuperAdminPayload> {
   try {
-    const [restSnap, adminsSnap, settingsSnap] = await Promise.all([
+    const [restSnap, adminsSnap, settingsSnap, reqSnap] = await Promise.all([
       getDocs(collection(db, "restaurants")),
       getDocs(collection(db, "platformAdmins")),
       getDoc(doc(db, "platformSettings", "default")),
+      getDocs(collection(db, "subscriptionRequests")),
     ]);
 
     const settings: PlatformSettings = settingsSnap.exists()
@@ -892,7 +1008,7 @@ export async function fetchSuperAdminPlatformData(): Promise<SuperAdminPayload> 
           branchCount: brSnap.size,
           orderCount: orders.length,
           revenue: Number(restRev.toFixed(2)),
-          primaryDomain: domains[0]?.hostname || `${r.slug}.qlub.app`,
+          primaryDomain: domains[0]?.hostname || `${r.slug}.viral.app`,
           domainVerified: domains[0]?.isVerified ?? false,
           ownerEmail:
             members.find((m) => m.role === "admin")?.email ||
@@ -902,10 +1018,20 @@ export async function fetchSuperAdminPlatformData(): Promise<SuperAdminPayload> 
       })
     );
 
+    const subscriptionRequests = reqSnap.docs
+      .map((d) =>
+        mapSubscriptionRequest(d.id, d.data() as Record<string, unknown>)
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
     return {
       restaurants,
       platformUsers,
       allMembers,
+      subscriptionRequests,
       settings,
       stats: {
         totalRestaurants: restaurants.length,
@@ -913,10 +1039,33 @@ export async function fetchSuperAdminPlatformData(): Promise<SuperAdminPayload> 
         totalOrders,
         totalProducts,
         totalRevenue: Number(totalRevenue.toFixed(2)),
+        pendingRequests: subscriptionRequests.filter(
+          (req) => req.status === "pending"
+        ).length,
       },
     };
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, "restaurants");
+  }
+}
+
+export async function updateSubscriptionRequestStatusInFirestore(
+  requestId: string,
+  status: SubscriptionRequestStatus,
+  provisionedSlug = ""
+): Promise<void> {
+  try {
+    await updateDoc(doc(db, "subscriptionRequests", requestId), {
+      status,
+      provisionedSlug: clamp(provisionedSlug, 100),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    handleFirestoreError(
+      error,
+      OperationType.UPDATE,
+      `subscriptionRequests/${requestId}`
+    );
   }
 }
 
@@ -1254,12 +1403,12 @@ export async function savePlatformSettingsInFirestore(
 ): Promise<void> {
   try {
     await setDoc(doc(db, "platformSettings", "default"), {
-      platformName: clamp(settings.platformName, 120, "QLUB Platform"),
-      supportEmail: clamp(settings.supportEmail, 200, "support@qlub.app"),
+      platformName: clamp(settings.platformName, 120, "VIRAL Platform"),
+      supportEmail: clamp(settings.supportEmail, 200, "support@viral.app"),
       defaultCnameTarget: clamp(
         settings.defaultCnameTarget,
         200,
-        "menus.qlub.app"
+        "menus.viral.app"
       ),
       allowSelfServiceOrdering: Boolean(settings.allowSelfServiceOrdering),
       defaultCurrency: ["SAR", "AED", "USD", "EUR"].includes(

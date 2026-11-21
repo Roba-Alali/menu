@@ -8,8 +8,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { deleteApp, initializeApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
+  getAuth,
   onAuthStateChanged,
   reload,
   sendEmailVerification,
@@ -63,6 +65,11 @@ interface AuthContextValue {
   resendVerificationEmail: () => Promise<boolean>;
   refreshSessionUser: () => Promise<PublicUser | null>;
   requestPasswordReset: (email: string) => Promise<void>;
+  provisionClientAuthAccount: (input: {
+    email: string;
+    password: string;
+    fullName?: string;
+  }) => Promise<{ status: "created" | "already_exists" | "failed"; note?: string }>;
   signOutUser: () => Promise<void>;
   resolveDefaultRoute: (user: PublicUser | null) => Promise<string>;
 }
@@ -106,7 +113,7 @@ async function syncUserAndRole(fbUser: FirebaseUser): Promise<PublicUser> {
   const fullName =
     fbUser.displayName?.trim() ||
     (email ? email.split("@")[0] : "") ||
-    "QLUB User";
+    "VIRAL User";
 
   if (!fbUser.emailVerified) {
     return {
@@ -205,7 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPublicUser({
           id: fbUser.uid,
           email: (fbUser.email || "").toLowerCase(),
-          fullName: fbUser.displayName || "QLUB User",
+          fullName: fbUser.displayName || "VIRAL User",
           platformRole:
             fbUser.emailVerified &&
             (fbUser.email || "").toLowerCase() === BOOT_ADMIN_EMAIL
@@ -396,6 +403,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const provisionClientAuthAccount = useCallback(
+    async (input: {
+      email: string;
+      password: string;
+      fullName?: string;
+    }): Promise<{
+      status: "created" | "already_exists" | "failed";
+      note?: string;
+    }> => {
+      const cleanEmail = input.email.trim().toLowerCase();
+      if (!cleanEmail || !input.password || input.password.length < 6) {
+        return {
+          status: "failed",
+          note: "Password must be at least 6 characters.",
+        };
+      }
+      const secondaryAppName = `viral-provision-${Date.now()}`;
+      const secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+      const secondaryAuth = getAuth(secondaryApp);
+      try {
+        const cred = await createUserWithEmailAndPassword(
+          secondaryAuth,
+          cleanEmail,
+          input.password
+        );
+        if (cred.user) {
+          if (input.fullName?.trim()) {
+            await updateProfile(cred.user, {
+              displayName: input.fullName.trim().slice(0, 120),
+            });
+          }
+          try {
+            await sendEmailVerification(cred.user);
+          } catch {
+            // Verification email rate-limit or unavailable should not abort provisioning
+          }
+        }
+        await signOut(secondaryAuth);
+        return {
+          status: "created",
+          note: "Login account created and verification email dispatched.",
+        };
+      } catch (error) {
+        const code =
+          typeof error === "object" && error !== null && "code" in error
+            ? String((error as { code?: unknown }).code || "")
+            : "";
+        if (code === "auth/email-already-in-use") {
+          return {
+            status: "already_exists",
+            note: "This email already has a Firebase Auth account; workspace access was linked.",
+          };
+        }
+        return {
+          status: "failed",
+          note: formatFirebaseAuthError(
+            error,
+            "Could not create Firebase password account."
+          ),
+        };
+      } finally {
+        try {
+          await deleteApp(secondaryApp);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    },
+    []
+  );
+
   const signOutUser = useCallback(async () => {
     setAuthError(null);
     await signOut(auth);
@@ -459,6 +537,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         resendVerificationEmail,
         refreshSessionUser,
         requestPasswordReset,
+        provisionClientAuthAccount,
         signOutUser,
         resolveDefaultRoute,
       }}

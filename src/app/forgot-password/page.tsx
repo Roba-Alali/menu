@@ -41,7 +41,7 @@ function ForgotPasswordForm() {
     <main className="min-h-screen bg-[#090b0b] px-5 py-12">
       <div className="mx-auto flex max-w-lg items-center justify-between">
         <Link href="/" className="text-xl font-semibold tracking-[0.22em]">
-          QLUB<span className="gold">.</span>
+          VIRAL<span className="gold">.</span>
         </Link>
         <Link
           href="/login"
@@ -111,10 +111,10 @@ function ForgotPasswordForm() {
               <span>{sending ? "Sending link..." : "Send password reset email"}</span>
             </button>
             <Link
-              href="/admin"
+              href="/login"
               className="flex h-11 items-center justify-center rounded-full border border-[#39413e] px-5 text-xs font-medium text-[#f5f5f1] hover:border-[#c8a66a]"
             >
-              Admin sign-in
+              Client sign in
             </Link>
           </div>
         </form>

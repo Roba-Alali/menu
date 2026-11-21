@@ -208,7 +208,7 @@
     },
     "DomainRoute": {
       "title": "DomainRoute",
-      "description": "Public hostname-to-slug lookup for custom domain white-label storefronts.",
+      "description": "Public hostname-to-slug lookup for custom domain storefronts.",
       "type": "object",
       "properties": {
         "hostname": { "type": "string", "minLength": 3, "maxLength": 200 },
@@ -219,6 +219,32 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["hostname", "restaurantId", "slug", "isVerified", "updatedAt"]
+    },
+    "SubscriptionRequest": {
+      "title": "SubscriptionRequest",
+      "description": "Restaurant subscription application submitted by prospective owners for Super Admin provisioning.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "restaurantName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "restaurantNameAr": { "type": "string", "maxLength": 120 },
+        "preferredSlug": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[a-z0-9\\-]+$" },
+        "ownerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "ownerEmail": { "type": "string", "format": "email", "maxLength": 200 },
+        "phone": { "type": "string", "minLength": 3, "maxLength": 40 },
+        "city": { "type": "string", "maxLength": 100 },
+        "branchCount": { "type": "number" },
+        "plan": { "type": "string", "enum": ["Starter", "Growth", "Enterprise"] },
+        "currency": { "type": "string", "enum": ["SAR", "AED", "USD", "EUR"] },
+        "primaryColor": { "type": "string", "maxLength": 20 },
+        "logoUrl": { "type": "string", "maxLength": 200000 },
+        "notes": { "type": "string", "maxLength": 600 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "provisionedSlug": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "restaurantName", "restaurantNameAr", "preferredSlug", "ownerName", "ownerEmail", "phone", "city", "branchCount", "plan", "currency", "primaryColor", "logoUrl", "notes", "status", "provisionedSlug", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -269,6 +295,10 @@
     "/restaurants/{slug}/orders/{orderId}": {
       "schema": { "$ref": "#/entities/Order" },
       "description": "Customer orders containing PII restricted to restaurant staff and platform admins."
+    },
+    "/subscriptionRequests/{requestId}": {
+      "schema": { "$ref": "#/entities/SubscriptionRequest" },
+      "description": "Prospective restaurant owner subscription requests reviewed exclusively by Super Admin."
     }
   }
 }

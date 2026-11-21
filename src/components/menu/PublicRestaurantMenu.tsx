@@ -515,7 +515,7 @@ export default function PublicRestaurantMenu({
         </section>
 
         <p className="muted mt-12 text-center text-[11px] tracking-[0.18em]">
-          POWERED BY QLUB PLATFORM
+          POWERED BY VIRAL PLATFORM
         </p>
       </div>
 
