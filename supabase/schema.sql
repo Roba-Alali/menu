@@ -1,4 +1,4 @@
--- Qlub White-Label Platform: initial multi-tenant schema
+-- Viral Restaurant Platform: initial multi-tenant schema
 -- Apply in a new Supabase project after reviewing policies for your deployment.
 
 create extension if not exists pgcrypto;

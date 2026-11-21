@@ -103,6 +103,11 @@ function formatFirebaseAuthError(error: unknown, fallback: string): string {
       return "Network error contacting Firebase Authentication. Check your connection and try again.";
     case "auth/popup-blocked":
       return "Sign-in popup was blocked by your browser. Allow popups for this site or sign in with Email & Password.";
+    case "auth/unauthorized-domain": {
+      const host =
+        typeof window !== "undefined" ? window.location.hostname : "this domain";
+      return `Google sign-in is not yet authorized for "${host}". Add "${host}" under Firebase Console -> Authentication -> Settings -> Authorized domains (project "${firebaseConfig.projectId}"), or sign in with Email & Password above.`;
+    }
     default:
       return error instanceof Error ? error.message : fallback;
   }

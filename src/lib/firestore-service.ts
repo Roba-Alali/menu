@@ -917,23 +917,30 @@ export async function fetchSuperAdminPlatformData(): Promise<SuperAdminPayload> 
       getDocs(collection(db, "subscriptionRequests")),
     ]);
 
-    const settings: PlatformSettings = settingsSnap.exists()
+    const rawSettings = settingsSnap.exists() ? settingsSnap.data() : null;
+    const rawName = String(rawSettings?.platformName || "");
+    const rawEmail = String(rawSettings?.supportEmail || "");
+    const rawCname = String(rawSettings?.defaultCnameTarget || "");
+
+    const settings: PlatformSettings = rawSettings
       ? {
-          platformName: String(
-            settingsSnap.data().platformName || DEFAULT_PLATFORM_SETTINGS.platformName
-          ),
-          supportEmail: String(
-            settingsSnap.data().supportEmail || DEFAULT_PLATFORM_SETTINGS.supportEmail
-          ),
-          defaultCnameTarget: String(
-            settingsSnap.data().defaultCnameTarget ||
-              DEFAULT_PLATFORM_SETTINGS.defaultCnameTarget
-          ),
+          platformName:
+            !rawName || /qlub/i.test(rawName)
+              ? DEFAULT_PLATFORM_SETTINGS.platformName
+              : rawName,
+          supportEmail:
+            !rawEmail || /qlub\.app/i.test(rawEmail)
+              ? DEFAULT_PLATFORM_SETTINGS.supportEmail
+              : rawEmail,
+          defaultCnameTarget:
+            !rawCname || /qlub\.app/i.test(rawCname)
+              ? DEFAULT_PLATFORM_SETTINGS.defaultCnameTarget
+              : rawCname,
           allowSelfServiceOrdering: Boolean(
-            settingsSnap.data().allowSelfServiceOrdering ?? true
+            rawSettings.allowSelfServiceOrdering ?? true
           ),
           defaultCurrency: String(
-            settingsSnap.data().defaultCurrency ||
+            rawSettings.defaultCurrency ||
               DEFAULT_PLATFORM_SETTINGS.defaultCurrency
           ),
         }
@@ -1540,12 +1547,13 @@ export async function ensureMembershipAndLoadDashboard(
       getDoc(doc(db, "platformSettings", "default")),
     ]);
 
-    const cnameTarget = settingsSnap.exists()
-      ? String(
-          settingsSnap.data().defaultCnameTarget ||
-            DEFAULT_PLATFORM_SETTINGS.defaultCnameTarget
-        )
-      : DEFAULT_PLATFORM_SETTINGS.defaultCnameTarget;
+    const rawCname = settingsSnap.exists()
+      ? String(settingsSnap.data().defaultCnameTarget || "")
+      : "";
+    const cnameTarget =
+      !rawCname || /qlub\.app/i.test(rawCname)
+        ? DEFAULT_PLATFORM_SETTINGS.defaultCnameTarget
+        : rawCname;
 
     return {
       accessDenied: false,
