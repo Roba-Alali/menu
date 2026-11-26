@@ -150,7 +150,6 @@ export default function RestaurantDashboard({
   );
   const [voiceTestLoading, setVoiceTestLoading] = useState(false);
   const [voiceTestPlaying, setVoiceTestPlaying] = useState(false);
-  const [voiceTestScript, setVoiceTestScript] = useState("");
   const [voiceTestError, setVoiceTestError] = useState("");
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -427,10 +426,9 @@ export default function RestaurantDashboard({
         mimeType?: string;
         error?: string;
       };
-      if (!res.ok || !data.audioBase64 || !data.scriptAr) {
+      if (!res.ok || !data.audioBase64) {
         throw new Error(data.error || "Unable to generate voice sample.");
       }
-      setVoiceTestScript(data.scriptAr);
       const audio = new Audio(
         `data:${data.mimeType || "audio/wav"};base64,${data.audioBase64}`
       );
@@ -1449,15 +1447,6 @@ export default function RestaurantDashboard({
                       )}
                     </button>
                   </div>
-
-                  {voiceTestScript && (
-                    <p
-                      dir="rtl"
-                      className="rounded-xl border border-[#252d2b] bg-[#111515] p-3 text-right text-xs leading-6 text-[#dce2df]"
-                    >
-                      {voiceTestScript}
-                    </p>
-                  )}
 
                   {voiceTestError && (
                     <p className="text-xs text-red-300" role="alert">

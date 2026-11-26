@@ -615,23 +615,24 @@ export default function PublicRestaurantMenu({
 
             {activeVoiceEntry && (
               <div
-                dir="rtl"
-                className="mt-3 rounded-xl border border-[#252d2b] bg-[#0c100f] px-4 py-3 text-right"
+                dir={isAr ? "rtl" : "ltr"}
+                className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-[#252d2b] bg-[#0c100f] px-4 py-2.5 text-[11px]"
               >
-                <div className="flex items-center justify-between gap-2 text-[11px]">
-                  <span style={{ color: accent }} className="font-semibold">
-                    {activeVoiceEntry.dishTitle}
-                    {activeVoiceEntry.question
-                      ? ` · سؤالك: ${activeVoiceEntry.question}`
-                      : ""}
-                  </span>
-                  <span className="muted">
-                    {playingVoiceKey ? "يتحدث الآن..." : "تم تشغيل الشرح"}
-                  </span>
-                </div>
-                <p className="mt-1.5 text-xs leading-6 text-[#e8ecea]">
-                  {activeVoiceEntry.scriptAr}
-                </p>
+                <span style={{ color: accent }} className="font-semibold">
+                  {activeVoiceEntry.dishTitle}
+                  {activeVoiceEntry.question
+                    ? ` · ${activeVoiceEntry.question}`
+                    : ""}
+                </span>
+                <span className="muted">
+                  {playingVoiceKey
+                    ? isAr
+                      ? "يتحدث الآن..."
+                      : "Speaking now..."
+                    : isAr
+                      ? "تم تشغيل الشرح"
+                      : "Playback finished"}
+                </span>
               </div>
             )}
 
@@ -997,15 +998,6 @@ export default function PublicRestaurantMenu({
                         <Send size={13} />
                       </button>
                     </div>
-
-                    {activeVoiceEntry?.dishId === activeProduct.id && (
-                      <p
-                        dir="rtl"
-                        className="rounded-xl border border-[#252d2b] bg-[#111515] p-3 text-right text-xs leading-6 text-[#e8ecea]"
-                      >
-                        {activeVoiceEntry.scriptAr}
-                      </p>
-                    )}
 
                     {voiceError && (
                       <p className="text-xs text-red-300" role="alert">
