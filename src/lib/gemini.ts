@@ -48,7 +48,9 @@ export function normalizeVoiceAgentVoice(input?: string | null): VoiceAgentVoice
 }
 
 export function getGeminiServerClient(apiVersion = "v1beta"): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  const apiKey = (process.env.GEMINI_API_KEY || "")
+    .trim()
+    .replace(/^["']|["']$/g, "");
   if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
     throw new Error(
       "GEMINI_API_KEY is not configured in the server environment yet."
