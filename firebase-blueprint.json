@@ -58,6 +58,8 @@
         "currency": { "type": "string", "enum": ["SAR", "AED", "USD", "EUR"] },
         "defaultLocale": { "type": "string", "enum": ["en", "ar"] },
         "isPublished": { "type": "boolean" },
+        "voiceAgentEnabled": { "type": "boolean" },
+        "voiceAgentVoice": { "type": "string", "enum": ["Kore", "Charon", "Puck", "Fenrir", "Zephyr"] },
         "plan": { "type": "string", "enum": ["Starter", "Growth", "Enterprise"] },
         "status": { "type": "string", "enum": ["Active", "Setup", "Suspended"] },
         "ownerUid": { "type": "string", "maxLength": 128 },

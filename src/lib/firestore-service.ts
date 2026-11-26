@@ -41,6 +41,7 @@ import type {
   SubscriptionRequest,
   SubscriptionRequestStatus,
   TenantStatus,
+  VoiceAgentVoice,
 } from "./types";
 
 function makeId(prefix: string): string {
@@ -92,6 +93,14 @@ function mapRestaurant(id: string, data: Record<string, unknown>): Restaurant {
     currency: String(data.currency || "SAR"),
     defaultLocale: (data.defaultLocale === "ar" ? "ar" : "en") as LocaleCode,
     isPublished: Boolean(data.isPublished),
+    voiceAgentEnabled: data.voiceAgentEnabled !== false,
+    voiceAgentVoice: (
+      ["Kore", "Charon", "Puck", "Fenrir", "Zephyr"].includes(
+        String(data.voiceAgentVoice || "")
+      )
+        ? String(data.voiceAgentVoice)
+        : "Kore"
+    ) as VoiceAgentVoice,
     plan: (["Starter", "Growth", "Enterprise"].includes(String(data.plan))
       ? String(data.plan)
       : "Starter") as PlanTier,
@@ -393,13 +402,22 @@ export async function fetchPublicRestaurantMenu(
     }
 
     if (!restaurant) {
-      // If Firestore has no published restaurants yet at all, check starter demo fallback cleanly
-      const anyPublished = await getDocs(
-        query(collection(db, "restaurants"), where("isPublished", "==", true))
-      );
-      if (anyPublished.empty) {
-        const starter = getStarterBundle(slug);
-        if (starter) {
+      // Serve built-in sample menu (al-nakheel) immediately or starter fallback if DB is unseeded
+      const starter = getStarterBundle(slug);
+      if (starter) {
+        if (slug === "al-nakheel") {
+          return {
+            restaurant: starter.restaurant,
+            branches: starter.branches.filter((b) => b.isActive),
+            categories: starter.categories,
+            products: starter.products,
+            isFallbackPreview: true,
+          };
+        }
+        const anyPublished = await getDocs(
+          query(collection(db, "restaurants"), where("isPublished", "==", true))
+        );
+        if (anyPublished.empty) {
           return {
             restaurant: starter.restaurant,
             branches: starter.branches.filter((b) => b.isActive),
@@ -739,6 +757,8 @@ export async function seedInitialDemoDataIfEmpty(
         currency: rest.currency,
         defaultLocale: rest.defaultLocale,
         isPublished: rest.isPublished,
+        voiceAgentEnabled: rest.voiceAgentEnabled !== false,
+        voiceAgentVoice: rest.voiceAgentVoice || "Kore",
         plan: rest.plan,
         status: rest.status,
         ownerUid: adminUid,
@@ -1144,6 +1164,8 @@ export async function provisionRestaurantInFirestore(
       currency,
       defaultLocale: input.defaultLocale === "ar" ? "ar" : "en",
       isPublished,
+      voiceAgentEnabled: true,
+      voiceAgentVoice: "Kore" as VoiceAgentVoice,
       plan: input.plan || "Starter",
       status,
       ownerUid: adminUid,
@@ -1623,6 +1645,17 @@ export async function saveRestaurantBrandInFirestore(
     if (patch.defaultLocale !== undefined)
       clean.defaultLocale = patch.defaultLocale === "ar" ? "ar" : "en";
     if (patch.isPublished !== undefined) clean.isPublished = patch.isPublished;
+    if (typeof patch.voiceAgentEnabled === "boolean") {
+      clean.voiceAgentEnabled = patch.voiceAgentEnabled;
+    }
+    if (
+      patch.voiceAgentVoice !== undefined &&
+      ["Kore", "Charon", "Puck", "Fenrir", "Zephyr"].includes(
+        patch.voiceAgentVoice
+      )
+    ) {
+      clean.voiceAgentVoice = patch.voiceAgentVoice;
+    }
 
     await updateDoc(doc(db, "restaurants", slug), clean);
     if (

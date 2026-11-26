@@ -15,6 +15,7 @@ import {
   Globe,
   ImagePlus,
   LayoutDashboard,
+  Loader2,
   LogOut,
   MapPin,
   Menu,
@@ -22,10 +23,13 @@ import {
   Plus,
   QrCode,
   ShoppingBag,
+  Sparkles,
+  Square,
   Trash2,
   Upload,
   Users,
   UtensilsCrossed,
+  Volume2,
   X,
 } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
@@ -77,6 +81,7 @@ import type {
   RestaurantDomain,
   RestaurantMember,
   RestaurantRole,
+  VoiceAgentVoice,
 } from "@/lib/types";
 
 type DashTab =
@@ -88,6 +93,10 @@ type DashTab =
   | "settings";
 
 const GALLERY_PRESETS = [
+  { label: "Saudi Kabsa", url: "/images/saudi_lamb_kabsa.jpg" },
+  { label: "Najdi Jareesh", url: "/images/saudi_najdi_jareesh.jpg" },
+  { label: "Saudi Sambosa", url: "/images/saudi_meze_samboosa.jpg" },
+  { label: "Dates Kunafa", url: "/images/saudi_dates_kunafa.jpg" },
   { label: "Truffle pasta", url: "/images/dish_truffle_pasta.jpg" },
   { label: "Grilled salmon", url: "/images/dish_grilled_salmon.jpg" },
   { label: "Burrata & tomato", url: "/images/dish_burrata_tomato.jpg" },
@@ -139,6 +148,20 @@ export default function RestaurantDashboard({
   const [previewLocale, setPreviewLocale] = useState<LocaleCode>(
     initialBundle.restaurant.defaultLocale
   );
+  const [voiceTestLoading, setVoiceTestLoading] = useState(false);
+  const [voiceTestPlaying, setVoiceTestPlaying] = useState(false);
+  const [voiceTestScript, setVoiceTestScript] = useState("");
+  const [voiceTestError, setVoiceTestError] = useState("");
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (voiceAudioRef.current) {
+        voiceAudioRef.current.pause();
+        voiceAudioRef.current = null;
+      }
+    };
+  }, []);
 
   // Category modal/form
   const [catForm, setCatForm] = useState({ name: "", nameAr: "", description: "" });
@@ -355,6 +378,8 @@ export default function RestaurantDashboard({
           currency: restaurant.currency,
           defaultLocale: restaurant.defaultLocale,
           isPublished: restaurant.isPublished,
+          voiceAgentEnabled: restaurant.voiceAgentEnabled !== false,
+          voiceAgentVoice: restaurant.voiceAgentVoice || "Kore",
         },
         initialBundle.restaurant.isPublished
       );
@@ -362,6 +387,64 @@ export default function RestaurantDashboard({
       showToast("Brand & storefront settings saved to Firestore.");
     } finally {
       setBrandSaving(false);
+    }
+  }
+
+  async function handleTestSaudiVoice() {
+    if (voiceTestPlaying && voiceAudioRef.current) {
+      voiceAudioRef.current.pause();
+      voiceAudioRef.current = null;
+      setVoiceTestPlaying(false);
+      return;
+    }
+    const sampleDish = products[0];
+    if (!sampleDish) {
+      setVoiceTestError("Add at least one dish to test the voice guide.");
+      return;
+    }
+    setVoiceTestError("");
+    setVoiceTestLoading(true);
+    try {
+      const res = await fetch("/api/menu-agent/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dishName: sampleDish.name,
+          dishNameAr: sampleDish.nameAr,
+          description: sampleDish.description,
+          descriptionAr: sampleDish.descriptionAr,
+          price: sampleDish.price,
+          currency: restaurant.currency,
+          allergens: sampleDish.allergens,
+          restaurantName: restaurant.name,
+          restaurantNameAr: restaurant.nameAr,
+          voiceName: restaurant.voiceAgentVoice || "Kore",
+        }),
+      });
+      const data = (await res.json()) as {
+        scriptAr?: string;
+        audioBase64?: string;
+        mimeType?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.audioBase64 || !data.scriptAr) {
+        throw new Error(data.error || "Unable to generate Saudi voice sample.");
+      }
+      setVoiceTestScript(data.scriptAr);
+      const audio = new Audio(
+        `data:${data.mimeType || "audio/wav"};base64,${data.audioBase64}`
+      );
+      voiceAudioRef.current = audio;
+      setVoiceTestPlaying(true);
+      audio.onended = () => setVoiceTestPlaying(false);
+      await audio.play();
+    } catch (err) {
+      setVoiceTestPlaying(false);
+      setVoiceTestError(
+        err instanceof Error ? err.message : "Saudi voice test failed."
+      );
+    } finally {
+      setVoiceTestLoading(false);
     }
   }
 
@@ -1287,6 +1370,96 @@ export default function RestaurantDashboard({
                       <option value="ar">Arabic (RTL)</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Smart Saudi Arabic Voice Agent Configuration */}
+                <div className="space-y-3 rounded-2xl border border-[#252d2b] bg-[#0d1010] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={15} className="gold" />
+                      <div>
+                        <p className="text-xs font-semibold text-[#f5f5f1]">
+                          Smart Saudi Arabic Voice Agent (المساعد الصوتي السعودي)
+                        </p>
+                        <p className="muted text-[11px]">
+                          Automatically enabled on every menu — explains each dish aloud in authentic Saudi Arabic.
+                        </p>
+                      </div>
+                    </div>
+
+                    <label className="flex cursor-pointer items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={restaurant.voiceAgentEnabled !== false}
+                        onChange={(e) =>
+                          setRestaurant({
+                            ...restaurant,
+                            voiceAgentEnabled: e.target.checked,
+                          })
+                        }
+                        className="h-4 w-4 accent-[#c8a66a]"
+                      />
+                      <span>Active on menu</span>
+                    </label>
+                  </div>
+
+                  <div className="grid gap-3 pt-1 sm:grid-cols-[1fr_auto]">
+                    <select
+                      value={restaurant.voiceAgentVoice || "Kore"}
+                      onChange={(e) =>
+                        setRestaurant({
+                          ...restaurant,
+                          voiceAgentVoice: e.target.value as VoiceAgentVoice,
+                        })
+                      }
+                      className="h-9 rounded-xl border border-[#252d2b] bg-[#111515] px-3 text-xs text-[#f5f5f1]"
+                    >
+                      <option value="Kore">Kore · Warm Saudi Hostess</option>
+                      <option value="Charon">Charon · Deep Saudi Chef</option>
+                      <option value="Puck">Puck · Lively Saudi Host</option>
+                      <option value="Fenrir">Fenrir · Expressive Culinary Host</option>
+                      <option value="Zephyr">Zephyr · Calm Concierge</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      disabled={voiceTestLoading || products.length === 0}
+                      onClick={() => void handleTestSaudiVoice()}
+                      className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-[#c8a66a] bg-[#1a1812] px-4 text-xs font-semibold text-[#e5c991] disabled:opacity-50"
+                    >
+                      {voiceTestLoading ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin" />
+                          Generating...
+                        </>
+                      ) : voiceTestPlaying ? (
+                        <>
+                          <Square size={12} />
+                          Stop preview
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 size={13} />
+                          Test Saudi voice
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {voiceTestScript && (
+                    <p
+                      dir="rtl"
+                      className="rounded-xl border border-[#252d2b] bg-[#111515] p-3 text-right text-xs leading-6 text-[#dce2df]"
+                    >
+                      {voiceTestScript}
+                    </p>
+                  )}
+
+                  {voiceTestError && (
+                    <p className="text-xs text-red-300" role="alert">
+                      {voiceTestError}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between border-t border-[#252d2b] pt-4">

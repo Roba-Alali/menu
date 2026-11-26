@@ -8,6 +8,7 @@ import {
   QrCode,
   ShieldCheck,
   Store,
+  Volume2,
 } from "lucide-react";
 import AdminHashRedirect from "@/components/AdminHashRedirect";
 import LandingPreview from "@/components/LandingPreview";
@@ -39,6 +40,11 @@ const modules = [
     icon: ChartNoAxesCombined,
     title: "Server-validated orders",
     text: "Order totals are computed from catalog pricing with instant kitchen status tracking in Firestore.",
+  },
+  {
+    icon: Volume2,
+    title: "Saudi Arabic Voice Dish Agent",
+    text: "Automatically active on every new menu — explains each dish aloud in warm Saudi dialect and answers guest questions.",
   },
   {
     icon: ShieldCheck,
@@ -128,10 +134,10 @@ export default function Home() {
               Subscribe
             </a>
             <Link
-              href="/r/the-house"
+              href="/r/al-nakheel"
               className="whitespace-nowrap shrink-0 transition-colors hover:text-[#f5f5f1]"
             >
-              Demo Menu
+              Sample Menu (Voice)
             </Link>
           </nav>
 
@@ -187,10 +193,11 @@ export default function Home() {
               Client Workspace Login
             </Link>
             <Link
-              href="/r/the-house"
-              className="whitespace-nowrap shrink-0 px-4 py-3.5 text-sm font-medium text-[#c8a66a] transition-opacity hover:opacity-80"
+              href="/r/al-nakheel"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 px-4 py-3.5 text-sm font-medium text-[#c8a66a] transition-opacity hover:opacity-80"
             >
-              Explore live menu
+              <Volume2 size={15} />
+              Sample menu · Saudi voice
             </Link>
           </div>
 
@@ -302,10 +309,17 @@ export default function Home() {
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
-                href="/r/the-house"
-                className="whitespace-nowrap shrink-0 rounded-full bg-[#c8a66a] px-6 py-2.5 text-sm font-medium text-[#10110e]"
+                href="/r/al-nakheel"
+                className="inline-flex items-center gap-2 whitespace-nowrap shrink-0 rounded-full bg-[#c8a66a] px-6 py-2.5 text-sm font-medium text-[#10110e]"
               >
-                Preview The House menu
+                <Volume2 size={15} />
+                Try Al-Nakheel sample menu
+              </Link>
+              <Link
+                href="/r/the-house"
+                className="whitespace-nowrap shrink-0 rounded-full border border-[#39413e] px-6 py-2.5 text-sm font-medium"
+              >
+                Preview The House
               </Link>
               <Link
                 href="/login"
@@ -349,8 +363,8 @@ export default function Home() {
             <Link href="/login" className="hover:text-[#f5f5f1]">
               Client Sign In
             </Link>
-            <Link href="/r/the-house" className="hover:text-[#f5f5f1]">
-              Live Demo
+            <Link href="/r/al-nakheel" className="hover:text-[#f5f5f1]">
+              Sample Voice Menu
             </Link>
           </div>
         </div>

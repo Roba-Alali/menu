@@ -92,7 +92,7 @@ service cloud.firestore {
 
     function isValidRestaurant(data) {
       return data.keys().hasAll(['id', 'name', 'nameAr', 'slug', 'description', 'descriptionAr', 'logoText', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'plan', 'status', 'ownerUid', 'createdAt', 'updatedAt']) &&
-        data.keys().hasOnly(['id', 'name', 'nameAr', 'slug', 'description', 'descriptionAr', 'logoText', 'logoUrl', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'plan', 'status', 'ownerUid', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'name', 'nameAr', 'slug', 'description', 'descriptionAr', 'logoText', 'logoUrl', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'voiceAgentEnabled', 'voiceAgentVoice', 'plan', 'status', 'ownerUid', 'createdAt', 'updatedAt']) &&
         isValidId(data.id) &&
         data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
         data.nameAr is string && data.nameAr.size() <= 120 &&
@@ -107,6 +107,8 @@ service cloud.firestore {
         data.currency in ['SAR', 'AED', 'USD', 'EUR'] &&
         data.defaultLocale in ['en', 'ar'] &&
         data.isPublished is bool &&
+        (!('voiceAgentEnabled' in data) || data.voiceAgentEnabled is bool) &&
+        (!('voiceAgentVoice' in data) || data.voiceAgentVoice in ['Kore', 'Charon', 'Puck', 'Fenrir', 'Zephyr']) &&
         data.plan in ['Starter', 'Growth', 'Enterprise'] &&
         data.status in ['Active', 'Setup', 'Suspended'] &&
         data.ownerUid is string && data.ownerUid.size() <= 128 &&
@@ -348,8 +350,8 @@ service cloud.firestore {
         incoming().slug == existing().slug &&
         incoming().createdAt == existing().createdAt &&
         incoming().updatedAt == request.time && (
-          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nameAr', 'description', 'descriptionAr', 'logoText', 'logoUrl', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'plan', 'status', 'ownerUid', 'updatedAt'])) ||
-          (isRestaurantMember(slug) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nameAr', 'description', 'descriptionAr', 'logoText', 'logoUrl', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'ownerUid', 'updatedAt']))
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nameAr', 'description', 'descriptionAr', 'logoText', 'logoUrl', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'voiceAgentEnabled', 'voiceAgentVoice', 'plan', 'status', 'ownerUid', 'updatedAt'])) ||
+          (isRestaurantMember(slug) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nameAr', 'description', 'descriptionAr', 'logoText', 'logoUrl', 'coverUrl', 'primaryColor', 'secondaryColor', 'currency', 'defaultLocale', 'isPublished', 'voiceAgentEnabled', 'voiceAgentVoice', 'ownerUid', 'updatedAt']))
         );
       allow delete: if isAdmin() && isValidId(slug);
 

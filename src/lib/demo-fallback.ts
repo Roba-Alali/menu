@@ -37,6 +37,30 @@ export function getStarterSeedDataset(): SeedDataset {
 
   const restaurants: Restaurant[] = [
     {
+      id: "al-nakheel",
+      name: "Al-Nakheel Saudi Kitchen",
+      nameAr: "مطبخ النخيل السعودي",
+      slug: "al-nakheel",
+      description:
+        "Authentic Saudi Najdi & Hejazi hospitality, slow-roasted dishes, and smart Saudi Arabic voice guidance for every plate.",
+      descriptionAr:
+        "ضيافة سعودية أصيلة بنكهات نجدية وحجازية، مع مساعد صوتي ذكي يشرح لك كل طبق باللهجة السعودية.",
+      logoText: "ن",
+      logoUrl: "",
+      coverUrl: "/images/restaurant_hero_interior.jpg",
+      primaryColor: "#c8a66a",
+      secondaryColor: "#111515",
+      currency: "SAR",
+      defaultLocale: "ar",
+      isPublished: true,
+      voiceAgentEnabled: true,
+      voiceAgentVoice: "Kore",
+      plan: "Growth",
+      status: "Active",
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
       id: "the-house",
       name: "The House",
       nameAr: "ذا هاوس",
@@ -52,6 +76,8 @@ export function getStarterSeedDataset(): SeedDataset {
       currency: "SAR",
       defaultLocale: "en",
       isPublished: true,
+      voiceAgentEnabled: true,
+      voiceAgentVoice: "Kore",
       plan: "Growth",
       status: "Active",
       createdAt: now,
@@ -73,6 +99,8 @@ export function getStarterSeedDataset(): SeedDataset {
       currency: "SAR",
       defaultLocale: "en",
       isPublished: true,
+      voiceAgentEnabled: true,
+      voiceAgentVoice: "Kore",
       plan: "Starter",
       status: "Active",
       createdAt: now,
@@ -93,6 +121,8 @@ export function getStarterSeedDataset(): SeedDataset {
       currency: "AED",
       defaultLocale: "en",
       isPublished: false,
+      voiceAgentEnabled: true,
+      voiceAgentVoice: "Kore",
       plan: "Starter",
       status: "Setup",
       createdAt: now,
@@ -101,6 +131,26 @@ export function getStarterSeedDataset(): SeedDataset {
   ];
 
   const branches: Branch[] = [
+    {
+      id: "br-nakheel-diriyah",
+      restaurantId: "al-nakheel",
+      name: "الرياض · مطل البجيري بالدرعية",
+      address: "Bujairi Terrace, Diriyah, Riyadh",
+      phone: "+966 11 510 7700",
+      isActive: true,
+      isPublic: true,
+      createdAt: now,
+    },
+    {
+      id: "br-nakheel-jeddah",
+      restaurantId: "al-nakheel",
+      name: "جدة · حي الروضة",
+      address: "Prince Sultan Road, Al-Rawdah, Jeddah",
+      phone: "+966 12 690 4400",
+      isActive: true,
+      isPublic: true,
+      createdAt: now,
+    },
     {
       id: "br-house-olaya",
       restaurantId: "the-house",
@@ -144,6 +194,39 @@ export function getStarterSeedDataset(): SeedDataset {
   ];
 
   const categories: MenuCategory[] = [
+    {
+      id: "cat-nakheel-starters",
+      restaurantId: "al-nakheel",
+      name: "Heritage Starters",
+      nameAr: "المقبلات التراثية",
+      description: "Warm crispy sambosa, mutabbaq, and house tahini dips.",
+      sortOrder: 1,
+      isActive: true,
+      isPublic: true,
+      createdAt: now,
+    },
+    {
+      id: "cat-nakheel-mains",
+      restaurantId: "al-nakheel",
+      name: "Saudi Signature Mains",
+      nameAr: "الأطباق السعودية الرئيسية",
+      description: "Slow-braised Hasawi Kabsa and authentic Najdi Jareesh.",
+      sortOrder: 2,
+      isActive: true,
+      isPublic: true,
+      createdAt: now,
+    },
+    {
+      id: "cat-nakheel-sweets",
+      restaurantId: "al-nakheel",
+      name: "Sweets & Saudi Coffee",
+      nameAr: "الحلويات والضيافة",
+      description: "Madinah date kunafa, saffron syrup, and roasted pistachios.",
+      sortOrder: 3,
+      isActive: true,
+      isPublic: true,
+      createdAt: now,
+    },
     {
       id: "cat-house-starters",
       restaurantId: "the-house",
@@ -224,6 +307,141 @@ export function getStarterSeedDataset(): SeedDataset {
   ];
 
   const products: Product[] = [
+    {
+      id: "prod-nakheel-sambosa",
+      restaurantId: "al-nakheel",
+      categoryId: "cat-nakheel-starters",
+      name: "Crispy Lamb Sambosa & Mutabbaq",
+      nameAr: "سمبوسة ومطبق لحم مقرمش",
+      description:
+        "Golden flaky pastry stuffed with spiced Najdi minced lamb, fresh chives, and emerald coriander tahini.",
+      descriptionAr:
+        "سمبوسة ومطبق محضر بعجينة مقرمشة ومحشو بلحم الغنم المتبل بالبهارات النجدية مع صلصة الطحينة بالكزبرة.",
+      imageUrl: "/images/saudi_meze_samboosa.jpg",
+      price: 38,
+      compareAtPrice: null,
+      isAvailable: true,
+      isFeatured: false,
+      sortOrder: 1,
+      allergens: ["Gluten", "Sesame"],
+      options: [
+        {
+          id: "opt-nakheel-dip",
+          name: "إضافة الصوص",
+          isRequired: false,
+          minSelect: 0,
+          maxSelect: 2,
+          values: [
+            { id: "val-daqoos", name: "دقوس حار منزلي", priceDelta: 6 },
+            { id: "val-tahini", name: "طحينة بالليمون الأسود", priceDelta: 6 },
+          ],
+        },
+      ],
+      isPublic: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "prod-nakheel-jareesh",
+      restaurantId: "al-nakheel",
+      categoryId: "cat-nakheel-mains",
+      name: "Authentic Najdi Jareesh with Wild Ghee",
+      nameAr: "جريش نجدي أصيل بالسمن البري",
+      description:
+        "Slow-simmered crushed wheat in strained buttermilk, finished with caramelized onions, mesammena spice, and golden wild ghee.",
+      descriptionAr:
+        "جريش مطبوخ على نار هادئة باللبن الطبيعي، يعلوه بصل مكرمل بالمسمنة ورشة سمن بري دافئ.",
+      imageUrl: "/images/saudi_najdi_jareesh.jpg",
+      price: 62,
+      compareAtPrice: null,
+      isAvailable: true,
+      isFeatured: true,
+      sortOrder: 2,
+      allergens: ["Dairy", "Gluten"],
+      options: [
+        {
+          id: "opt-jareesh-size",
+          name: "حجم الطبق",
+          isRequired: true,
+          minSelect: 1,
+          maxSelect: 1,
+          values: [
+            { id: "val-j-single", name: "حصة فردية", priceDelta: 0 },
+            { id: "val-j-majlis", name: "صحن مشاركة للمجلس", priceDelta: 45 },
+          ],
+        },
+      ],
+      isPublic: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "prod-nakheel-kabsa",
+      restaurantId: "al-nakheel",
+      categoryId: "cat-nakheel-mains",
+      name: "Royal Saffron & Loomi Lamb Kabsa",
+      nameAr: "كبسة كتف حاشي وغنم بالزعفران واللومي",
+      description:
+        "Slow-roasted lamb shoulder over fragrant saffron basmati rice infused with black loomi, toasted pine nuts, and golden raisins.",
+      descriptionAr:
+        "كتف غنم محمر ببطء فوق أرز بسمتي عنبر معطر بالزعفران واللومي الأسود مع الصنوبر المحمص والزبيب والهيل.",
+      imageUrl: "/images/saudi_lamb_kabsa.jpg",
+      price: 118,
+      compareAtPrice: 132,
+      isAvailable: true,
+      isFeatured: true,
+      sortOrder: 3,
+      allergens: ["Tree Nuts"],
+      options: [
+        {
+          id: "opt-kabsa-portion",
+          name: "الحجم",
+          isRequired: true,
+          minSelect: 1,
+          maxSelect: 1,
+          values: [
+            { id: "val-k-solo", name: "نفر واحد فاخر", priceDelta: 0 },
+            { id: "val-k-duo", name: "وليمة لشخصين", priceDelta: 95 },
+          ],
+        },
+        {
+          id: "opt-kabsa-side",
+          name: "مقبلات جانبية",
+          isRequired: false,
+          minSelect: 0,
+          maxSelect: 2,
+          values: [
+            { id: "val-k-daqoos", name: "دقوس طماطم وفلفل أخضر", priceDelta: 8 },
+            { id: "val-k-laban", name: "لبن عيران بالنعناع", priceDelta: 14 },
+          ],
+        },
+      ],
+      isPublic: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "prod-nakheel-kunafa",
+      restaurantId: "al-nakheel",
+      categoryId: "cat-nakheel-sweets",
+      name: "Madinah Ajwa Date & Saffron Kunafa",
+      nameAr: "كنافة تمر العجوة والقشطة بالزعفران",
+      description:
+        "Crisp golden kataifi pastry filled with warm clotted cream and Ajwa dates, glazed with saffron syrup and roasted pistachios.",
+      descriptionAr:
+        "كنافة ذهبية مقرمشة محشوة بقشطة طازجة وتمر عجوة المدينة، مسقية بشيرة الزعفران والفستق الحلبي والورد الطائفي.",
+      imageUrl: "/images/saudi_dates_kunafa.jpg",
+      price: 46,
+      compareAtPrice: null,
+      isAvailable: true,
+      isFeatured: true,
+      sortOrder: 4,
+      allergens: ["Dairy", "Gluten", "Tree Nuts"],
+      options: [],
+      isPublic: true,
+      createdAt: now,
+      updatedAt: now,
+    },
     {
       id: "prod-house-burrata",
       restaurantId: "the-house",
@@ -448,6 +666,16 @@ export function getStarterSeedDataset(): SeedDataset {
   ];
 
   const qrCodes: QrCodeRecord[] = [
+    {
+      id: "qr-nakheel-diriyah",
+      restaurantId: "al-nakheel",
+      branchId: "br-nakheel-diriyah",
+      label: "Bujairi · Majlis Table 01",
+      targetPath: "/r/al-nakheel?branch=br-nakheel-diriyah&table=01",
+      token: "nk-diriyah-t01",
+      isActive: true,
+      createdAt: now,
+    },
     {
       id: "qr-house-main",
       restaurantId: "the-house",

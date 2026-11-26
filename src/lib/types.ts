@@ -10,6 +10,7 @@ export type OrderStatus =
 export type PlanTier = "Starter" | "Growth" | "Enterprise";
 export type TenantStatus = "Active" | "Setup" | "Suspended";
 export type LocaleCode = "en" | "ar";
+export type VoiceAgentVoice = "Kore" | "Charon" | "Puck" | "Fenrir" | "Zephyr";
 
 export interface PublicUser {
   id: string;
@@ -33,6 +34,8 @@ export interface Restaurant {
   currency: string;
   defaultLocale: LocaleCode;
   isPublished: boolean;
+  voiceAgentEnabled?: boolean;
+  voiceAgentVoice?: VoiceAgentVoice;
   plan: PlanTier;
   status: TenantStatus;
   ownerUid?: string;

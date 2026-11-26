@@ -9,7 +9,7 @@ import type { Branch, MenuCategory, Product, Restaurant } from "@/lib/types";
 
 function DemoContent() {
   const searchParams = useSearchParams();
-  const slug = searchParams.get("tenant") || "the-house";
+  const slug = searchParams.get("tenant") || "al-nakheel";
   const branchParam = searchParams.get("branch") || undefined;
   const tableParam = searchParams.get("table") || undefined;
 
@@ -29,8 +29,8 @@ function DemoContent() {
     setLoading(true);
     fetchPublicRestaurantMenu(slug, Boolean(publicUser))
       .then(async (res) => {
-        if (res || slug === "the-house") return res;
-        return fetchPublicRestaurantMenu("the-house", Boolean(publicUser));
+        if (res || slug === "al-nakheel") return res;
+        return fetchPublicRestaurantMenu("al-nakheel", Boolean(publicUser));
       })
       .then((res) => {
         if (!active) return;

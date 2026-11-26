@@ -1,16 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
   CheckCircle2,
   Globe,
+  Loader2,
   MapPin,
   Minus,
   Plus,
   Search,
+  Send,
   ShoppingBag,
+  Sparkles,
+  Square,
+  Volume2,
   X,
 } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
@@ -23,7 +28,26 @@ import type {
   Order,
   Product,
   Restaurant,
+  VoiceAgentVoice,
 } from "@/lib/types";
+
+const VOICE_OPTIONS: Array<{ value: VoiceAgentVoice; labelAr: string; labelEn: string }> = [
+  { value: "Kore", labelAr: "كوري (ترحيبي دافئ)", labelEn: "Kore · Warm Host" },
+  { value: "Charon", labelAr: "كارون (شيف رزين)", labelEn: "Charon · Deep Chef" },
+  { value: "Puck", labelAr: "باك (حيوي ودود)", labelEn: "Puck · Lively Host" },
+  { value: "Fenrir", labelAr: "فنرير (حماسي واضح)", labelEn: "Fenrir · Expressive" },
+  { value: "Zephyr", labelAr: "زيفير (هادئ راقٍ)", labelEn: "Zephyr · Calm Guide" },
+];
+
+interface VoiceCacheEntry {
+  scriptAr: string;
+  audioBase64: string;
+  mimeType: string;
+  voiceName: VoiceAgentVoice;
+  dishId: string;
+  dishTitle: string;
+  question?: string;
+}
 
 interface CartEntry {
   key: string;
@@ -79,6 +103,28 @@ export default function PublicRestaurantMenu({
   const [orderError, setOrderError] = useState("");
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
 
+  // Smart Saudi Arabic Voice Agent state
+  const voiceAgentEnabled = restaurant.voiceAgentEnabled !== false;
+  const [selectedVoice, setSelectedVoice] = useState<VoiceAgentVoice>(
+    restaurant.voiceAgentVoice || "Kore"
+  );
+  const [loadingVoiceDishId, setLoadingVoiceDishId] = useState<string | null>(null);
+  const [playingVoiceKey, setPlayingVoiceKey] = useState<string | null>(null);
+  const [activeVoiceEntry, setActiveVoiceEntry] = useState<VoiceCacheEntry | null>(null);
+  const [voiceError, setVoiceError] = useState("");
+  const [dishQuestion, setDishQuestion] = useState("");
+  const [voiceCache, setVoiceCache] = useState<Record<string, VoiceCacheEntry>>({});
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
   const isAr = locale === "ar";
   const accent = restaurant.primaryColor || "#c8a66a";
   const surface = restaurant.secondaryColor || "#111515";
@@ -128,7 +174,121 @@ export default function PublicRestaurantMenu({
     }
     setPickedValues(defaults);
     setModalQty(1);
+    setDishQuestion("");
     setActiveProduct(product);
+  }
+
+  function stopVoiceAudio() {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+    setPlayingVoiceKey(null);
+  }
+
+  function playCachedEntry(cacheKey: string, entry: VoiceCacheEntry) {
+    stopVoiceAudio();
+    setActiveVoiceEntry(entry);
+    setVoiceError("");
+    const src = `data:${entry.mimeType};base64,${entry.audioBase64}`;
+    const audio = new Audio(src);
+    audioRef.current = audio;
+    setPlayingVoiceKey(cacheKey);
+    audio.onended = () => {
+      setPlayingVoiceKey((prev) => (prev === cacheKey ? null : prev));
+    };
+    audio.onerror = () => {
+      setPlayingVoiceKey(null);
+      setVoiceError("Could not play the generated audio clip in this browser.");
+    };
+    void audio.play().catch((err) => {
+      setPlayingVoiceKey(null);
+      setVoiceError(
+        err instanceof Error
+          ? err.message
+          : "Tap Play again to allow audio playback in your browser."
+      );
+    });
+  }
+
+  async function handleExplainDishVoice(product: Product, customQuestion?: string) {
+    const cleanQ = (customQuestion || "").trim();
+    const cacheKey = `${product.id}:${selectedVoice}:${cleanQ || "_intro"}`;
+
+    if (playingVoiceKey === cacheKey) {
+      stopVoiceAudio();
+      return;
+    }
+
+    const cached = voiceCache[cacheKey];
+    if (cached) {
+      playCachedEntry(cacheKey, cached);
+      return;
+    }
+
+    stopVoiceAudio();
+    setVoiceError("");
+    setLoadingVoiceDishId(product.id);
+    const cat = categories.find((c) => c.id === product.categoryId);
+
+    try {
+      const res = await fetch("/api/menu-agent/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dishName: product.name,
+          dishNameAr: product.nameAr,
+          description: product.description,
+          descriptionAr: product.descriptionAr,
+          categoryName: cat?.nameAr || cat?.name || "",
+          price: product.price,
+          currency: restaurant.currency,
+          allergens: product.allergens,
+          options: product.options.map((o) => ({
+            name: o.name,
+            values: o.values.map((v) => v.name),
+          })),
+          restaurantName: restaurant.name,
+          restaurantNameAr: restaurant.nameAr,
+          question: cleanQ,
+          voiceName: selectedVoice,
+        }),
+      });
+      const payload = (await res.json()) as {
+        scriptAr?: string;
+        audioBase64?: string;
+        mimeType?: string;
+        voiceName?: VoiceAgentVoice;
+        error?: string;
+      };
+      if (!res.ok || !payload.audioBase64 || !payload.scriptAr) {
+        throw new Error(
+          payload.error || "Unable to generate Saudi voice explanation."
+        );
+      }
+
+      const entry: VoiceCacheEntry = {
+        scriptAr: payload.scriptAr,
+        audioBase64: payload.audioBase64,
+        mimeType: payload.mimeType || "audio/wav",
+        voiceName: payload.voiceName || selectedVoice,
+        dishId: product.id,
+        dishTitle: product.nameAr || product.name,
+        question: cleanQ || undefined,
+      };
+      setVoiceCache((prev) => ({ ...prev, [cacheKey]: entry }));
+      playCachedEntry(cacheKey, entry);
+      if (cleanQ) setDishQuestion("");
+    } catch (err) {
+      setVoiceError(
+        err instanceof Error
+          ? err.message
+          : "Smart voice agent request failed."
+      );
+    } finally {
+      setLoadingVoiceDishId((prev) => (prev === product.id ? null : prev));
+    }
   }
 
   function quickAddProduct(product: Product) {
@@ -369,6 +529,112 @@ export default function PublicRestaurantMenu({
           )}
         </section>
 
+        {/* Smart Saudi Arabic Voice Dish Agent Banner */}
+        {voiceAgentEnabled && products.length > 0 && (
+          <section className="mt-6 rounded-2xl border border-[#252d2b] bg-[#111615] p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#252d2b] bg-[#0a0c0b]"
+                  style={{ color: accent }}
+                >
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-[#f5f5f1]">
+                    {isAr
+                      ? "المساعد الصوتي الذكي · يشرح لك كل طبق باللهجة السعودية"
+                      : "Smart Saudi Voice Guide · Explains every dish in Arabic"}
+                  </p>
+                  <p className="muted mt-0.5 text-[11px] leading-5">
+                    {isAr
+                      ? "اضغط على «اسمع الشرح» عند أي طبق أو اسأل عن المكونات والحساسية بصوت سعودي طبيعي."
+                      : "Tap Explain in Saudi Voice on any plate below to hear ingredients, flavors, and chef tips."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  aria-label="Saudi voice persona"
+                  value={selectedVoice}
+                  onChange={(e) => {
+                    stopVoiceAudio();
+                    setSelectedVoice(e.target.value as VoiceAgentVoice);
+                  }}
+                  className="h-9 rounded-full border border-[#252d2b] bg-[#0a0c0b] px-3 text-xs text-[#f5f5f1]"
+                >
+                  {VOICE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {isAr ? opt.labelAr : opt.labelEn}
+                    </option>
+                  ))}
+                </select>
+
+                {playingVoiceKey ? (
+                  <button
+                    type="button"
+                    onClick={stopVoiceAudio}
+                    className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border border-red-400/40 bg-red-950/30 px-4 text-xs font-medium text-red-200"
+                  >
+                    <Square size={12} />
+                    {isAr ? "إيقاف الصوت" : "Stop audio"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={Boolean(loadingVoiceDishId)}
+                    onClick={() => {
+                      const featured =
+                        filteredProducts.find((p) => p.isFeatured) ||
+                        filteredProducts[0] ||
+                        products[0];
+                      if (featured) void handleExplainDishVoice(featured);
+                    }}
+                    className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-xs font-semibold text-[#10110e] disabled:opacity-50"
+                    style={{ backgroundColor: accent }}
+                  >
+                    {loadingVoiceDishId ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Volume2 size={13} />
+                    )}
+                    {isAr ? "جرّب الشرح الصوتي" : "Hear featured dish"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {activeVoiceEntry && (
+              <div
+                dir="rtl"
+                className="mt-3 rounded-xl border border-[#252d2b] bg-[#0c100f] px-4 py-3 text-right"
+              >
+                <div className="flex items-center justify-between gap-2 text-[11px]">
+                  <span style={{ color: accent }} className="font-semibold">
+                    {activeVoiceEntry.dishTitle}
+                    {activeVoiceEntry.question
+                      ? ` · سؤالك: ${activeVoiceEntry.question}`
+                      : ""}
+                  </span>
+                  <span className="muted">
+                    {playingVoiceKey ? "يتحدث الآن باللهجة السعودية..." : "تم تشغيل الشرح"}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-xs leading-6 text-[#e8ecea]">
+                  {activeVoiceEntry.scriptAr}
+                </p>
+              </div>
+            )}
+
+            {voiceError && (
+              <p className="mt-3 text-xs text-red-300" role="alert">
+                {voiceError}
+              </p>
+            )}
+          </section>
+        )}
+
         {/* Search & Category Filter */}
         <section className="mt-8 space-y-4">
           <div className="relative">
@@ -476,7 +742,7 @@ export default function PublicRestaurantMenu({
                         ? item.descriptionAr || item.description
                         : item.description}
                     </p>
-                    <div className="mt-2.5 flex items-center gap-3">
+                    <div className="mt-2.5 flex flex-wrap items-center gap-3">
                       <span className="tabular-nums text-sm font-semibold">
                         {item.price}{" "}
                         <span className="muted text-xs font-normal">
@@ -492,6 +758,36 @@ export default function PublicRestaurantMenu({
                         <span className="text-xs text-[#e5c991]">
                           {isAr ? "نفذت الكمية" : "Unavailable"}
                         </span>
+                      )}
+
+                      {voiceAgentEnabled && (
+                        <button
+                          type="button"
+                          disabled={loadingVoiceDishId === item.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleExplainDishVoice(item);
+                          }}
+                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#2d3633] bg-[#0c100f] px-3 py-1 text-[11px] font-medium text-[#e5c991] transition-colors hover:border-[#c8a66a] disabled:opacity-50"
+                        >
+                          {loadingVoiceDishId === item.id ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              {isAr ? "جاري التحضير..." : "Preparing voice..."}
+                            </>
+                          ) : playingVoiceKey ===
+                            `${item.id}:${selectedVoice}:_intro` ? (
+                            <>
+                              <Square size={11} />
+                              {isAr ? "إيقاف" : "Stop"}
+                            </>
+                          ) : (
+                            <>
+                              <Volume2 size={12} />
+                              {isAr ? "اسمع الشرح" : "Explain (Saudi Voice)"}
+                            </>
+                          )}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -593,6 +889,94 @@ export default function PublicRestaurantMenu({
                     {isAr ? "مسببات الحساسية: " : "Allergens: "}
                     {activeProduct.allergens.join(" · ")}
                   </p>
+                )}
+
+                {voiceAgentEnabled && (
+                  <div className="mt-5 space-y-3 rounded-2xl border border-[#252d2b] bg-[#0c100f] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#f5f5f1]">
+                        <Sparkles size={13} style={{ color: accent }} />
+                        {isAr
+                          ? "شرح الطبق بالصوت السعودي"
+                          : "Saudi Voice Dish Host"}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={loadingVoiceDishId === activeProduct.id}
+                        onClick={() => void handleExplainDishVoice(activeProduct)}
+                        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold text-[#10110e] disabled:opacity-50"
+                        style={{ backgroundColor: accent }}
+                      >
+                        {loadingVoiceDishId === activeProduct.id ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin" />
+                            {isAr ? "جاري التوليد..." : "Loading..."}
+                          </>
+                        ) : playingVoiceKey ===
+                          `${activeProduct.id}:${selectedVoice}:_intro` ? (
+                          <>
+                            <Square size={11} />
+                            {isAr ? "إيقاف الشرح" : "Stop audio"}
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 size={13} />
+                            {isAr ? "اسمع الشرح الآن" : "Play Saudi Explanation"}
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        dir="rtl"
+                        value={dishQuestion}
+                        onChange={(e) => setDishQuestion(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && dishQuestion.trim()) {
+                            e.preventDefault();
+                            void handleExplainDishVoice(activeProduct, dishQuestion);
+                          }
+                        }}
+                        placeholder={
+                          isAr
+                            ? "اسأل المضيف (مثلاً: هل الطبق حار؟ وش أفضل إضافة؟)"
+                            : "Ask in Arabic/English (e.g. Is it spicy or nut-free?)"
+                        }
+                        className="h-9 flex-1 rounded-xl border border-[#252d2b] bg-[#111515] px-3 text-xs text-[#f5f5f1]"
+                      />
+                      <button
+                        type="button"
+                        disabled={
+                          !dishQuestion.trim() ||
+                          loadingVoiceDishId === activeProduct.id
+                        }
+                        onClick={() =>
+                          void handleExplainDishVoice(activeProduct, dishQuestion)
+                        }
+                        aria-label="Ask Saudi voice agent"
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[#252d2b] bg-[#141918] text-[#e5c991] disabled:opacity-40"
+                      >
+                        <Send size={13} />
+                      </button>
+                    </div>
+
+                    {activeVoiceEntry?.dishId === activeProduct.id && (
+                      <p
+                        dir="rtl"
+                        className="rounded-xl border border-[#252d2b] bg-[#111515] p-3 text-right text-xs leading-6 text-[#e8ecea]"
+                      >
+                        {activeVoiceEntry.scriptAr}
+                      </p>
+                    )}
+
+                    {voiceError && (
+                      <p className="text-xs text-red-300" role="alert">
+                        {voiceError}
+                      </p>
+                    )}
+                  </div>
                 )}
 
                 {activeProduct.options.length > 0 && (
