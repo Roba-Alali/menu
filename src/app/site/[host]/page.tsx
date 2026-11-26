@@ -64,18 +64,18 @@ function CustomDomainMenuContent() {
             <span className="font-mono-num text-[#c8a66a]">{hostname}</span> is
             not verified or linked to a published restaurant menu yet.
           </p>
-          <div className="mt-6 flex justify-center gap-3">
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link
-              href="/login"
+              href="/?platform=1#menus"
               className="rounded-full bg-[#c8a66a] px-6 py-2.5 text-xs font-semibold text-[#10110e]"
             >
-              Sign in to verify
+              VIRAL Home &amp; All Menus
             </Link>
             <Link
-              href="/"
+              href="/login"
               className="rounded-full border border-[#39413e] px-5 py-2.5 text-xs font-medium"
             >
-              VIRAL Home
+              Sign in to verify
             </Link>
           </div>
         </div>

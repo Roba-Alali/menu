@@ -60,7 +60,7 @@ export default function LandingPreview({
           <span className="text-xs tracking-[0.18em] text-[#aab4af]">
             LIVE TENANT PREVIEW
           </span>
-          <div className="flex items-center gap-1 rounded-lg bg-[#171d1b] p-1">
+          <div className="flex flex-wrap items-center gap-1 rounded-lg bg-[#171d1b] p-1">
             {tenants.map((t) => (
               <button
                 key={t.restaurant.slug}
@@ -139,11 +139,14 @@ export default function LandingPreview({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#252d2b] pt-4 text-xs">
-        <span className="text-[#9aa6a1]">
-          Brand theme <span aria-hidden="true">·</span> {restaurant.currency}{" "}
-          <span aria-hidden="true">·</span>{" "}
+        <a
+          href="#menus"
+          className="text-[#9aa6a1] transition-colors hover:text-[#c8a66a]"
+        >
+          All menus ({tenants.length}) <span aria-hidden="true">·</span>{" "}
+          {restaurant.currency} <span aria-hidden="true">·</span>{" "}
           {restaurant.isPublished ? "Published" : "Draft mode"}
-        </span>
+        </a>
         <div className="flex items-center gap-4">
           <Link
             href={`/dashboard/${restaurant.slug}`}

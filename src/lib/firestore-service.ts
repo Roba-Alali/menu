@@ -312,7 +312,7 @@ export async function fetchLandingPreviewData(): Promise<{
     );
     let totalProducts = 0;
     const tenants = await Promise.all(
-      restaurants.slice(0, 3).map(async (restaurant) => {
+      restaurants.map(async (restaurant) => {
         const [catsSnap, prodsSnap] = await Promise.all([
           getDocs(
             query(
@@ -348,9 +348,28 @@ export async function fetchLandingPreviewData(): Promise<{
       })
     );
 
+    // Ensure the built-in Al-Nakheel voice sample menu is always reachable in the directory
+    if (!tenants.some((t) => t.restaurant.slug === "al-nakheel")) {
+      const starterNakheel = getStarterBundle("al-nakheel");
+      if (starterNakheel) {
+        tenants.push({
+          restaurant: starterNakheel.restaurant,
+          sampleItems: starterNakheel.products.slice(0, 2).map((p) => ({
+            name: p.name,
+            category:
+              starterNakheel.categories.find((c) => c.id === p.categoryId)
+                ?.name || "Menu",
+            price: p.price,
+            imageUrl: p.imageUrl,
+          })),
+        });
+        totalProducts += starterNakheel.products.length;
+      }
+    }
+
     return {
       tenants,
-      restaurantCount: restaurants.length,
+      restaurantCount: tenants.length,
       productCount: Math.max(totalProducts, 1),
     };
   } catch (error) {

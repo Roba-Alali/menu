@@ -4,6 +4,8 @@ const IGNORED_PREFIXES = [
   "/_next",
   "/api",
   "/images",
+  "/assets",
+  "/favicon.ico",
   "/r",
   "/dashboard",
   "/admin",
@@ -15,20 +17,73 @@ const IGNORED_PREFIXES = [
 
 const RESERVED_SUBDOMAINS = new Set(["www", "app", "admin", "menus", "api"]);
 
+function normalizeHost(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .split("/")[0]
+    .split(":")[0];
+}
+
+function getConfiguredPlatformHosts(): Set<string> {
+  const candidates = [
+    process.env.PLATFORM_HOSTS || "",
+    process.env.NEXT_PUBLIC_PLATFORM_HOST || "",
+    process.env.VERCEL_URL || "",
+    process.env.VERCEL_BRANCH_URL || "",
+    process.env.VERCEL_PROJECT_PRODUCTION_URL || "",
+  ];
+  const hosts = new Set<string>([
+    "localhost",
+    "127.0.0.1",
+    "::1",
+    "viral.app",
+    "www.viral.app",
+    "menus.viral.app",
+  ]);
+  for (const entry of candidates) {
+    for (const part of entry.split(",")) {
+      const cleaned = normalizeHost(part);
+      if (cleaned) hosts.add(cleaned);
+    }
+  }
+  return hosts;
+}
+
+const PLATFORM_HOST_SUFFIXES = [
+  ".run.app",
+  ".vercel.app",
+  ".web.app",
+  ".firebaseapp.com",
+  ".netlify.app",
+  ".pages.dev",
+  ".up.railway.app",
+  ".onrender.com",
+];
+
+function isPlatformHost(hostname: string): boolean {
+  const configured = getConfiguredPlatformHosts();
+  if (configured.has(hostname)) return true;
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return true;
+  return PLATFORM_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix));
+}
+
 function extractHost(req: NextRequest): string {
   const raw =
     req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
-  return raw.split(",")[0].trim().split(":")[0].toLowerCase();
+  return normalizeHost(raw.split(",")[0] || "");
 }
 
 export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const { pathname, searchParams } = req.nextUrl;
 
   if (
     IGNORED_PREFIXES.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
     ) ||
-    pathname.includes(".")
+    pathname.includes(".") ||
+    searchParams.get("platform") === "1"
   ) {
     return NextResponse.next();
   }
@@ -37,15 +92,7 @@ export function middleware(req: NextRequest) {
   if (!hostname) return NextResponse.next();
 
   // Direct platform hosts serve normal platform landing/app routes
-  if (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "viral.app" ||
-    hostname === "www.viral.app" ||
-    hostname === "menus.viral.app" ||
-    hostname.endsWith(".run.app") ||
-    /^\d+\.\d+\.\d+\.\d+$/.test(hostname)
-  ) {
+  if (isPlatformHost(hostname)) {
     return NextResponse.next();
   }
 

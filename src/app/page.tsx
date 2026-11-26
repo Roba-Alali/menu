@@ -11,6 +11,7 @@ import {
   Volume2,
 } from "lucide-react";
 import AdminHashRedirect from "@/components/AdminHashRedirect";
+import AllMenusDirectory from "@/components/AllMenusDirectory";
 import LandingPreview from "@/components/LandingPreview";
 import SubscriptionRequestForm from "@/components/SubscriptionRequestForm";
 import { getStarterSeedDataset } from "@/lib/demo-fallback";
@@ -109,6 +110,12 @@ export default function Home() {
           </Link>
 
           <nav className="hidden items-center gap-7 text-sm text-[#aab4af] md:flex">
+            <a
+              href="#menus"
+              className="whitespace-nowrap shrink-0 transition-colors hover:text-[#f5f5f1]"
+            >
+              All Menus
+            </a>
             <a
               href="#platform"
               className="whitespace-nowrap shrink-0 transition-colors hover:text-[#f5f5f1]"
@@ -223,6 +230,9 @@ export default function Home() {
 
         <LandingPreview tenants={previewTenants} />
       </section>
+
+      {/* All Live Menus Directory */}
+      <AllMenusDirectory initialRestaurants={seed.restaurants} />
 
       {/* Self-service onboarding workflow */}
       <section
