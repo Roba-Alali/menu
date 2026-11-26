@@ -1428,7 +1428,7 @@ export default function SuperAdminConsole({
                   <p className="text-sm leading-6 text-[#cfd6d3]">
                     <strong>{provisioned.restaurant.name}</strong> has been
                     provisioned with starter categories, a main branch, a QR
-                    code, Smart Saudi Arabic Voice Dish Agent, and owner access.
+                    code, Smart Voice Dish Agent, and owner access.
                     Send the handoff details below to the restaurant owner:
                   </p>
 

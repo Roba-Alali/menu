@@ -21,9 +21,20 @@ interface ExplainRequestBody {
   voiceName?: string;
 }
 
+function isTransientHighDemandError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return (
+    message.includes("high demand") ||
+    message.includes("UNAVAILABLE") ||
+    message.includes("503")
+  );
+}
+
 function getHttpStatusFromGeminiError(err: unknown): number {
   const message = err instanceof Error ? err.message : String(err);
-  if (message.includes("GEMINI_API_KEY")) return 503;
+  if (message.includes("GEMINI_API_KEY") || isTransientHighDemandError(err)) {
+    return 503;
+  }
   if (message.includes("RESOURCE_EXHAUSTED") || message.includes("429")) return 429;
   if (
     message.includes("PERMISSION_DENIED") ||
@@ -112,17 +123,34 @@ export async function POST(req: NextRequest) {
   try {
     const ai = getGeminiServerClient();
 
-    // 1) Generate authentic Saudi dialect culinary explanation
-    const textResponse = await ai.models.generateContent({
-      model: "gemini-4-hydrogen",
-      contents: dishPrompt,
-      config: {
-        systemInstruction,
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW,
+    // 1) Generate authentic Saudi dialect culinary explanation (fallback to gemini-3.1-flash-lite on transient 503)
+    let textResponse;
+    try {
+      textResponse = await ai.models.generateContent({
+        model: "gemini-4-hydrogen",
+        contents: dishPrompt,
+        config: {
+          systemInstruction,
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.LOW,
+          },
         },
-      },
-    });
+      });
+    } catch (textErr) {
+      if (!isTransientHighDemandError(textErr)) {
+        throw textErr;
+      }
+      textResponse = await ai.models.generateContent({
+        model: "gemini-3.1-flash-lite",
+        contents: dishPrompt,
+        config: {
+          systemInstruction,
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.LOW,
+          },
+        },
+      });
+    }
 
     const scriptAr = (textResponse.text || "")
       .replace(/[*#_`~>\[\]]/g, "")
@@ -136,8 +164,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2) Synthesize natural Saudi Arabic speech WAV via Gemini TTS
-    const ttsResponse = await ai.models.generateContent({
+    // 2) Synthesize natural Saudi Arabic speech WAV via Gemini TTS (single retry on transient 503)
+    const ttsParams = {
       model: "gemini-3.8-flash-lite-tts",
       contents: [
         {
@@ -163,7 +191,18 @@ export async function POST(req: NextRequest) {
           },
         },
       },
-    });
+    };
+
+    let ttsResponse;
+    try {
+      ttsResponse = await ai.models.generateContent(ttsParams);
+    } catch (ttsErr) {
+      if (!isTransientHighDemandError(ttsErr)) {
+        throw ttsErr;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      ttsResponse = await ai.models.generateContent(ttsParams);
+    }
 
     const audioPart = ttsResponse.candidates?.[0]?.content?.parts?.find(
       (part) => part.inlineData?.data
@@ -189,7 +228,6 @@ export async function POST(req: NextRequest) {
       voiceName,
     });
   } catch (err) {
-    console.error("Smart Saudi Voice Agent error:", err);
     let message =
       err instanceof Error ? err.message : "Failed to generate voice response.";
     try {

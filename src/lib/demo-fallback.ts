@@ -42,9 +42,9 @@ export function getStarterSeedDataset(): SeedDataset {
       nameAr: "مطبخ النخيل السعودي",
       slug: "al-nakheel",
       description:
-        "Authentic Saudi Najdi & Hejazi hospitality, slow-roasted dishes, and smart Saudi Arabic voice guidance for every plate.",
+        "Authentic Najdi & Hejazi hospitality, slow-roasted dishes, and smart voice assistant guidance for every plate.",
       descriptionAr:
-        "ضيافة سعودية أصيلة بنكهات نجدية وحجازية، مع مساعد صوتي ذكي يشرح لك كل طبق باللهجة السعودية.",
+        "ضيافة أصيلة بنكهات نجدية وحجازية، مع إمكانية الاستعانة بمساعدنا الذكي لسماع شرح كل طبق.",
       logoText: "ن",
       logoUrl: "",
       coverUrl: "/images/restaurant_hero_interior.jpg",

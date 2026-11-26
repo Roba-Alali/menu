@@ -16,22 +16,22 @@ export const VOICE_AGENT_VOICE_LABELS: Record<
   Kore: {
     label: "Kore · Warm Hostess",
     labelAr: "كوري · صوت نسائي ترحيبي دافئ",
-    tone: "Warm & welcoming female Saudi hospitality host",
+    tone: "Warm & welcoming hospitality host",
   },
   Charon: {
     label: "Charon · Deep Chef",
     labelAr: "كارون · صوت رجالي رزين وعميق",
-    tone: "Deep, refined Saudi head-chef presence",
+    tone: "Deep, refined head-chef presence",
   },
   Puck: {
     label: "Puck · Lively Host",
     labelAr: "باك · صوت شبابي حيوي وودود",
-    tone: "Energetic, friendly Saudi dining host",
+    tone: "Energetic, friendly dining host",
   },
   Fenrir: {
     label: "Fenrir · Expressive Chef",
     labelAr: "فنرير · صوت رجالي واثق وحماسي",
-    tone: "Bold, enthusiastic Saudi culinary storyteller",
+    tone: "Bold, enthusiastic culinary storyteller",
   },
   Zephyr: {
     label: "Zephyr · Calm Concierge",
@@ -47,15 +47,16 @@ export function normalizeVoiceAgentVoice(input?: string | null): VoiceAgentVoice
   return "Kore";
 }
 
-export function getGeminiServerClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || !apiKey.trim()) {
+export function getGeminiServerClient(apiVersion = "v1beta"): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
     throw new Error(
-      "GEMINI_API_KEY is not configured on the server environment."
+      "GEMINI_API_KEY is not configured in the server environment yet."
     );
   }
   return new GoogleGenAI({
-    apiKey: apiKey.trim(),
+    apiKey,
+    apiVersion,
     httpOptions: {
       headers: {
         "User-Agent": "aistudio-build",

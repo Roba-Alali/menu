@@ -390,7 +390,7 @@ export default function RestaurantDashboard({
     }
   }
 
-  async function handleTestSaudiVoice() {
+  async function handleTestSmartVoice() {
     if (voiceTestPlaying && voiceAudioRef.current) {
       voiceAudioRef.current.pause();
       voiceAudioRef.current = null;
@@ -428,7 +428,7 @@ export default function RestaurantDashboard({
         error?: string;
       };
       if (!res.ok || !data.audioBase64 || !data.scriptAr) {
-        throw new Error(data.error || "Unable to generate Saudi voice sample.");
+        throw new Error(data.error || "Unable to generate voice sample.");
       }
       setVoiceTestScript(data.scriptAr);
       const audio = new Audio(
@@ -441,7 +441,7 @@ export default function RestaurantDashboard({
     } catch (err) {
       setVoiceTestPlaying(false);
       setVoiceTestError(
-        err instanceof Error ? err.message : "Saudi voice test failed."
+        err instanceof Error ? err.message : "Voice test failed."
       );
     } finally {
       setVoiceTestLoading(false);
@@ -1372,17 +1372,21 @@ export default function RestaurantDashboard({
                   </div>
                 </div>
 
-                {/* Smart Saudi Arabic Voice Agent Configuration */}
+                {/* Smart Voice Agent Configuration */}
                 <div className="space-y-3 rounded-2xl border border-[#252d2b] bg-[#0d1010] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Sparkles size={15} className="gold" />
+                    <div className="flex items-center gap-2.5">
+                      <img
+                        src="/assets/aistudio/_______96e5f76d.png"
+                        alt="Smart Voice Assistant"
+                        className="h-8 w-8 rounded-full border border-[#c8a66a]/45 bg-[#111515] object-cover"
+                      />
                       <div>
                         <p className="text-xs font-semibold text-[#f5f5f1]">
-                          Smart Saudi Arabic Voice Agent (المساعد الصوتي السعودي)
+                          Smart Voice Dish Agent (المساعد الصوتي الذكي)
                         </p>
                         <p className="muted text-[11px]">
-                          Automatically enabled on every menu — explains each dish aloud in authentic Saudi Arabic.
+                          Automatically enabled on every menu — explains each dish aloud and answers guest questions.
                         </p>
                       </div>
                     </div>
@@ -1414,9 +1418,9 @@ export default function RestaurantDashboard({
                       }
                       className="h-9 rounded-xl border border-[#252d2b] bg-[#111515] px-3 text-xs text-[#f5f5f1]"
                     >
-                      <option value="Kore">Kore · Warm Saudi Hostess</option>
-                      <option value="Charon">Charon · Deep Saudi Chef</option>
-                      <option value="Puck">Puck · Lively Saudi Host</option>
+                      <option value="Kore">Kore · Warm Hostess</option>
+                      <option value="Charon">Charon · Deep Chef</option>
+                      <option value="Puck">Puck · Lively Host</option>
                       <option value="Fenrir">Fenrir · Expressive Culinary Host</option>
                       <option value="Zephyr">Zephyr · Calm Concierge</option>
                     </select>
@@ -1424,7 +1428,7 @@ export default function RestaurantDashboard({
                     <button
                       type="button"
                       disabled={voiceTestLoading || products.length === 0}
-                      onClick={() => void handleTestSaudiVoice()}
+                      onClick={() => void handleTestSmartVoice()}
                       className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-[#c8a66a] bg-[#1a1812] px-4 text-xs font-semibold text-[#e5c991] disabled:opacity-50"
                     >
                       {voiceTestLoading ? (
@@ -1440,7 +1444,7 @@ export default function RestaurantDashboard({
                       ) : (
                         <>
                           <Volume2 size={13} />
-                          Test Saudi voice
+                          Test smart voice
                         </>
                       )}
                     </button>

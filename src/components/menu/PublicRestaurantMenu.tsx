@@ -264,7 +264,7 @@ export default function PublicRestaurantMenu({
       };
       if (!res.ok || !payload.audioBase64 || !payload.scriptAr) {
         throw new Error(
-          payload.error || "Unable to generate Saudi voice explanation."
+          payload.error || "Unable to generate smart voice explanation."
         );
       }
 
@@ -529,34 +529,36 @@ export default function PublicRestaurantMenu({
           )}
         </section>
 
-        {/* Smart Saudi Arabic Voice Dish Agent Banner */}
+        {/* Smart Voice Dish Agent Banner */}
         {voiceAgentEnabled && products.length > 0 && (
           <section className="mt-6 rounded-2xl border border-[#252d2b] bg-[#111615] p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-start gap-3">
+              <div className="flex items-center gap-3.5">
                 <div
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#252d2b] bg-[#0a0c0b]"
-                  style={{ color: accent }}
+                  className="h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 bg-white shadow-sm"
+                  style={{ borderColor: accent }}
                 >
-                  <Sparkles size={18} />
+                  <img
+                    src="/assets/aistudio/_______96e5f76d.png"
+                    alt={isAr ? "المساعد الذكي" : "Smart Assistant"}
+                    className="h-full w-full object-cover"
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-[#f5f5f1]">
-                    {isAr
-                      ? "المساعد الصوتي الذكي · يشرح لك كل طبق باللهجة السعودية"
-                      : "Smart Saudi Voice Guide · Explains every dish in Arabic"}
+                    {isAr ? "المساعد الصوتي الذكي" : "Smart Voice Assistant"}
                   </p>
-                  <p className="muted mt-0.5 text-[11px] leading-5">
+                  <p className="muted mt-0.5 text-xs leading-5">
                     {isAr
-                      ? "اضغط على «اسمع الشرح» عند أي طبق أو اسأل عن المكونات والحساسية بصوت سعودي طبيعي."
-                      : "Tap Explain in Saudi Voice on any plate below to hear ingredients, flavors, and chef tips."}
+                      ? "استعن بمساعدنا الذكي لسماع الشرح"
+                      : "Use our smart assistant to hear dish details"}
                   </p>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
                 <select
-                  aria-label="Saudi voice persona"
+                  aria-label="Voice persona"
                   value={selectedVoice}
                   onChange={(e) => {
                     stopVoiceAudio();
@@ -591,15 +593,21 @@ export default function PublicRestaurantMenu({
                         products[0];
                       if (featured) void handleExplainDishVoice(featured);
                     }}
-                    className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-xs font-semibold text-[#10110e] disabled:opacity-50"
+                    className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full px-4 text-xs font-semibold text-[#10110e] disabled:opacity-50"
                     style={{ backgroundColor: accent }}
                   >
                     {loadingVoiceDishId ? (
                       <Loader2 size={13} className="animate-spin" />
                     ) : (
-                      <Volume2 size={13} />
+                      <img
+                        src="/assets/aistudio/_______96e5f76d.png"
+                        alt=""
+                        className="h-5 w-5 rounded-full bg-white object-cover"
+                      />
                     )}
-                    {isAr ? "جرّب الشرح الصوتي" : "Hear featured dish"}
+                    {isAr
+                      ? "استعن بمساعدنا الذكي لسماع الشرح"
+                      : "Hear featured dish"}
                   </button>
                 )}
               </div>
@@ -618,7 +626,7 @@ export default function PublicRestaurantMenu({
                       : ""}
                   </span>
                   <span className="muted">
-                    {playingVoiceKey ? "يتحدث الآن باللهجة السعودية..." : "تم تشغيل الشرح"}
+                    {playingVoiceKey ? "يتحدث الآن..." : "تم تشغيل الشرح"}
                   </span>
                 </div>
                 <p className="mt-1.5 text-xs leading-6 text-[#e8ecea]">
@@ -764,29 +772,40 @@ export default function PublicRestaurantMenu({
                         <button
                           type="button"
                           disabled={loadingVoiceDishId === item.id}
+                          title={
+                            isAr
+                              ? "استعن بمساعدنا الذكي لسماع الشرح"
+                              : "Use our smart assistant"
+                          }
+                          aria-label={
+                            isAr
+                              ? `استعن بمساعدنا الذكي لشرح ${item.nameAr || item.name}`
+                              : `Hear assistant explanation for ${item.name}`
+                          }
                           onClick={(e) => {
                             e.stopPropagation();
                             void handleExplainDishVoice(item);
                           }}
-                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#2d3633] bg-[#0c100f] px-3 py-1 text-[11px] font-medium text-[#e5c991] transition-colors hover:border-[#c8a66a] disabled:opacity-50"
+                          className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-white shadow-sm transition-transform hover:scale-105 disabled:opacity-60"
+                          style={{ borderColor: accent }}
                         >
-                          {loadingVoiceDishId === item.id ? (
-                            <>
-                              <Loader2 size={12} className="animate-spin" />
-                              {isAr ? "جاري التحضير..." : "Preparing voice..."}
-                            </>
-                          ) : playingVoiceKey ===
-                            `${item.id}:${selectedVoice}:_intro` ? (
-                            <>
-                              <Square size={11} />
-                              {isAr ? "إيقاف" : "Stop"}
-                            </>
-                          ) : (
-                            <>
-                              <Volume2 size={12} />
-                              {isAr ? "اسمع الشرح" : "Explain (Saudi Voice)"}
-                            </>
+                          <img
+                            src="/assets/aistudio/_______96e5f76d.png"
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                          {loadingVoiceDishId === item.id && (
+                            <span className="absolute inset-0 grid place-items-center bg-black/55 text-white">
+                              <Loader2 size={15} className="animate-spin" />
+                            </span>
                           )}
+                          {playingVoiceKey ===
+                            `${item.id}:${selectedVoice}:_intro` &&
+                            loadingVoiceDishId !== item.id && (
+                              <span className="absolute inset-0 grid place-items-center bg-black/55 text-white">
+                                <Square size={12} />
+                              </span>
+                            )}
                         </button>
                       )}
                     </div>
@@ -894,23 +913,36 @@ export default function PublicRestaurantMenu({
                 {voiceAgentEnabled && (
                   <div className="mt-5 space-y-3 rounded-2xl border border-[#252d2b] bg-[#0c100f] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#f5f5f1]">
-                        <Sparkles size={13} style={{ color: accent }} />
-                        {isAr
-                          ? "شرح الطبق بالصوت السعودي"
-                          : "Saudi Voice Dish Host"}
+                      <span className="inline-flex items-center gap-2 text-xs font-semibold text-[#f5f5f1]">
+                        <img
+                          src="/assets/aistudio/_______96e5f76d.png"
+                          alt=""
+                          className="h-7 w-7 rounded-full border bg-white object-cover"
+                          style={{ borderColor: accent }}
+                        />
+                        {isAr ? "مساعدنا الذكي" : "Smart Dish Assistant"}
                       </span>
                       <button
                         type="button"
                         disabled={loadingVoiceDishId === activeProduct.id}
+                        aria-label={
+                          isAr
+                            ? "استعن بمساعدنا الذكي لسماع الشرح"
+                            : "Use our smart assistant"
+                        }
+                        title={
+                          isAr
+                            ? "استعن بمساعدنا الذكي لسماع الشرح"
+                            : "Use our smart assistant"
+                        }
                         onClick={() => void handleExplainDishVoice(activeProduct)}
-                        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold text-[#10110e] disabled:opacity-50"
+                        className="inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold text-[#10110e] disabled:opacity-50"
                         style={{ backgroundColor: accent }}
                       >
                         {loadingVoiceDishId === activeProduct.id ? (
                           <>
                             <Loader2 size={12} className="animate-spin" />
-                            {isAr ? "جاري التوليد..." : "Loading..."}
+                            {isAr ? "جاري التحضير..." : "Loading..."}
                           </>
                         ) : playingVoiceKey ===
                           `${activeProduct.id}:${selectedVoice}:_intro` ? (
@@ -920,8 +952,12 @@ export default function PublicRestaurantMenu({
                           </>
                         ) : (
                           <>
-                            <Volume2 size={13} />
-                            {isAr ? "اسمع الشرح الآن" : "Play Saudi Explanation"}
+                            <img
+                              src="/assets/aistudio/_______96e5f76d.png"
+                              alt=""
+                              className="h-5 w-5 rounded-full bg-white object-cover"
+                            />
+                            {isAr ? "تشغيل الشرح" : "Play Explanation"}
                           </>
                         )}
                       </button>
@@ -941,8 +977,8 @@ export default function PublicRestaurantMenu({
                         }}
                         placeholder={
                           isAr
-                            ? "اسأل المضيف (مثلاً: هل الطبق حار؟ وش أفضل إضافة؟)"
-                            : "Ask in Arabic/English (e.g. Is it spicy or nut-free?)"
+                            ? "اسأل مساعدنا الذكي (مثلاً: هل الطبق حار؟ وش أفضل إضافة؟)"
+                            : "Ask our smart assistant (e.g. Is it spicy or nut-free?)"
                         }
                         className="h-9 flex-1 rounded-xl border border-[#252d2b] bg-[#111515] px-3 text-xs text-[#f5f5f1]"
                       />
@@ -955,7 +991,7 @@ export default function PublicRestaurantMenu({
                         onClick={() =>
                           void handleExplainDishVoice(activeProduct, dishQuestion)
                         }
-                        aria-label="Ask Saudi voice agent"
+                        aria-label="Ask smart assistant"
                         className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[#252d2b] bg-[#141918] text-[#e5c991] disabled:opacity-40"
                       >
                         <Send size={13} />

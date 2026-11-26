@@ -43,8 +43,8 @@ const modules = [
   },
   {
     icon: Volume2,
-    title: "Saudi Arabic Voice Dish Agent",
-    text: "Automatically active on every new menu — explains each dish aloud in warm Saudi dialect and answers guest questions.",
+    title: "Smart Voice Dish Agent",
+    text: "Automatically active on every new menu — explains each dish aloud and answers guest questions.",
   },
   {
     icon: ShieldCheck,
@@ -197,7 +197,7 @@ export default function Home() {
               className="inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 px-4 py-3.5 text-sm font-medium text-[#c8a66a] transition-opacity hover:opacity-80"
             >
               <Volume2 size={15} />
-              Sample menu · Saudi voice
+              Sample menu · Smart voice
             </Link>
           </div>
 

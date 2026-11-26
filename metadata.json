@@ -1,0 +1,8 @@
+{
+  "name": "VIRAL Platform",
+  "description": "Multi-tenant digital menus, QR table ordering, brand editor, and operations console for restaurant portfolios.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
